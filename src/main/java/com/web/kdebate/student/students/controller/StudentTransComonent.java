@@ -1,14 +1,11 @@
 package com.web.kdebate.student.students.controller;
 
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.web.common.util.HttpUtil;
 import com.web.kdebate.student.students.domain.AcaStdDataVo;
 import com.web.kdebate.student.students.domain.AcaStdRequestVo;
-import com.web.kdebate.student.students.domain.AcaStdResponseVo;
 import com.web.kdebate.student.students.domain.CreateStudentInfoVO;
-import com.web.kdebate.student.students.domain.StudentInfoMngVO;
 import com.web.kdebate.student.students.service.StudentInfoMngService;
 import com.web.kdebate.student.students.service.StudentTransService;
 
@@ -18,10 +15,10 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.Reader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -30,6 +27,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Component
+@Profile("real")
 @EnableScheduling
 public class StudentTransComonent {
 
@@ -43,7 +41,7 @@ public class StudentTransComonent {
     private StudentInfoMngService studentInfoMngService;
 
     @SuppressWarnings("unchecked")
-    //@Scheduled(fixedRate = 300000)
+    @Scheduled(fixedRate = 300000)
     public void getStudentInfo() {
          
         try{
@@ -141,10 +139,5 @@ public class StudentTransComonent {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
     }
-    
-
-
-
 }
