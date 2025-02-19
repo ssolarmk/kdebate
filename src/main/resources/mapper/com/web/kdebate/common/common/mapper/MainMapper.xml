@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.web.kdebate.common.common.mapper.MainMapper">
+
+	<select id="getQueryTotalCnt" resultType="int">
+	/* MainMapper.getQueryTotalCnt */
+		SELECT FOUND_ROWS()
+	</select>
+
+	<select id="getCenterStatusCntList" parameterType="hashMap" resultType="hashMap">
+	/* MainMapper.getCenterStatusCntList */
+		SELECT IFNULL(FORMAT(COUNT(1), 0), 0) AS center_cnt
+		     , IFNULL(FORMAT(SUM(CASE WHEN T1.CONT_STAT = '00' THEN 1 ELSE NULL END), 0), 0) AS open_cnt
+		     , IFNULL(FORMAT(SUM(CASE WHEN T1.CONT_STAT IN ('01', '02', '99') THEN 1 ELSE NULL END), 0), 0) AS ready_cnt
+		     , IFNULL(FORMAT(SUM(T2.STD_CNT), 0), 0) AS reg_std_cnt
+		     , IFNULL(FORMAT(SUM(T2.CNT_01 + T2.CNT_04), 0), 0) AS  on_std_cnt
+		  FROM TB_ACA T1
+		  JOIN (SELECT ACA_ID
+		        	 , COUNT(1) AS STD_CNT
+                     , IFNULL(SUM(CASE WHEN STD_STATUS = '00' THEN 1 ELSE NULL END), 0) AS CNT_00
+                     , IFNULL(SUM(CASE WHEN STD_STATUS = '01'THEN 1 ELSE NULL END), 0) AS CNT_01
+                     , IFNULL(SUM(CASE WHEN STD_STATUS = '02' THEN 1 ELSE NULL END), 0) AS CNT_02
+                     , IFNULL(SUM(CASE WHEN STD_STATUS = '03' THEN 1 ELSE NULL END), 0) AS CNT_03
+                     , IFNULL(SUM(CASE WHEN STD_STATUS = '04' THEN 1 ELSE NULL END), 0) AS CNT_04
+                 FROM TB_STD_INFO
+		         GROUP BY ACA_ID
+		         ) T2
+		     ON T1.ACA_ID = T2.ACA_ID
+		  WHERE T1.P_ACA_ID = #{p_aca_id}
+		    AND T1.USE_YN = 'Y'
+	 </select>
+
+    <select id="getBossPtListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* MainMapper.getBossPtListRetrieve */
+		SELECT T1.PT_SEQ AS pt_seq
+		     , T1.PT_TITLE AS pt_title
+		     , T1.PT_ATD_TARGET AS pt_atd_target
+		     , CONCAT(T1.PT_DT, '  ', T1.PT_TM) AS pt_dt
+		     , T1.CNTS AS cnts
+		     , CASE WHEN IFNULL(T2.ACA_ID, 'X') = 'X' THEN '미대상자' ELSE '대상자' END AS atd_chk
+		  FROM TB_PT_INFO T1
+		  LEFT OUTER JOIN (SELECT PT_SEQ
+		  						, ACA_ID
+		                     FROM  TB_PT_ATD
+		                    WHERE ACA_ID = #{aca_id}
+		        		  ) T2
+       		ON T2.PT_SEQ = T1.PT_SEQ
+		 WHERE T1.PT_ATD_GB  = '02'
+		   AND T1.PT_STATUS = '01'
+		   AND T1.PT_DT BETWEEN DATE_FORMAT(NOW(), '%Y-%m-%d') AND DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 20 DAY), '%Y-%m-%d')
+		 <choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY T1.ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+	</select>
+
+    <select id="getParentPtListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* MainMapper.getParentPtListRetrieve */
+		SELECT T1.PT_SEQ AS pt_seq
+		     , T1.ACA_ID AS ACA_ID
+		     , T3.ACA_NM AS pt_aca_nm
+		     , T1.PT_TITLE AS pt_title
+		     , T1.PT_ATD_TARGET AS pt_atd_target
+		     , CONCAT(T1.PT_DT, '  ', T1.PT_TM) AS pt_dt
+		     , T1.CNTS AS cnts
+		     , IFNULL(T2.CNT, 0) AS resv_cnt
+		  FROM TB_PT_INFO T1
+		  LEFT OUTER JOIN (SELECT PT_SEQ
+		   						, COUNT(1) AS CNT
+		                  	 FROM TB_PT_ATD
+		                 	GROUP BY PT_SEQ
+		        		   ) T2
+      		ON T2.PT_SEQ = T1.PT_SEQ
+		  JOIN TB_ACA T3
+		  	ON T3.ACA_ID = T1.ACA_ID
+		 WHERE T1.PT_ATD_GB  = '01'
+		   AND T1.PT_STATUS = '01'
+		   AND T1.PT_DT BETWEEN DATE_FORMAT(NOW(), '%Y-%m-%d') AND DATE_FORMAT(DATE_ADD(NOW(), INTERVAL 20 DAY), '%Y-%m-%d')
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY T1.ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+	</select>
+
+	<select id="getAnnualSalesTrendRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* MainMapper.getAnnualSalesTrendRetrieve */
+		 SELECT M.SALES_MON AS sales_mon
+		      , NVL(S.BONSA_AMT + S.ACA_AMT, 0) AS amt
+			  , NVL(S.STD_CNT, 0) AS std_cnt
+			  , NVL(S.IN_CNT, 0) AS in_cnt
+		   FROM (SELECT DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 12 - @rownum:=@rownum+1 MONTH), '%Y-%m') AS SALES_MON
+				   FROM (SELECT @ROWNUM :=0
+						   FROM TB_CALENDAR
+						 ) T1
+				  LIMIT 12
+				) M
+		   LEFT OUTER JOIN (SELECT T1.SALES_MON
+								 , IFNULL(ROUND((SUM(T1.BONSA_AMT) / 100000), 1), 0) AS BONSA_AMT
+								 , IFNULL(ROUND((SUM(T1.ACA_AMT) / 100000), 1), 0) AS ACA_AMT
+								 , IFNULL(SUM(T2.CNT_STD), 0) AS STD_CNT
+								 , IFNULL(SUM(T2.CNT_IN + T2.CNT_READY ), 0) AS IN_CNT
+							  FROM TB_STAT_SALES_MON T1
+							  JOIN TB_STAT_ACA_MON T2
+							    ON T2.SALES_MON = T1.SALES_MON
+							    AND T2.ACA_ID = T1.CORP_CD
+							  JOIN TB_ACA T3
+							    ON T1.CORP_CD = T3.ACA_ID
+							    AND T3.P_ACA_ID = #{aca_id}
+							  WHERE T1.SALES_MON BETWEEN DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 12 MONTH), '%Y-%m')
+							    AND DATE_FORMAT(NOW(), '%Y-%m')
+							    AND ((#{aca_id} = #{aca_id} AND 1=1) OR (#{p_aca_id} <![CDATA[<>]]> #{aca_id} AND T1.CORP_CD = #{aca_id}))
+							  GROUP BY T1.SALES_MON
+							) S
+		     ON M.SALES_MON = S.SALES_MON
+		  ORDER BY M.SALES_MON
+	</select>
+
+	<select id="getUserStatusCntList" parameterType="hashMap" resultType="hashMap">
+	/* MainMapper.getUserStatusCntList */
+		SELECT IFNULL(FORMAT(SUM(A.STD_CNT), 0), 0) AS reg_std_cnt
+		     , IFNULL(FORMAT(SUM(A.CNT_01 + A.CNT_04), 0), 0) AS  on_std_cnt
+		     , IFNULL(CNT_00, 0) AS ready_std_cnt
+		     , B.atd_cnt
+		     , ((SELECT SEAT_CNT FROM TB_CLASS_ROOM WHERE ACA_ID = A.ACA_ID AND ROOM_NO = '1' AND USE_YN = 'Y') - C.atd_cnt) AS remain_cnt
+		  FROM (SELECT ACA_ID
+		        	 , COUNT(1) AS STD_CNT
+		             , IFNULL(SUM(CASE WHEN STD_STATUS = '00' THEN 1 ELSE NULL END), 0) AS CNT_00
+		             , IFNULL(SUM(CASE WHEN STD_STATUS = '01'THEN 1 ELSE NULL END), 0) AS CNT_01
+		             , IFNULL(SUM(CASE WHEN STD_STATUS = '04' THEN 1 ELSE NULL END), 0) AS CNT_04
+		          FROM TB_STD_INFO
+		         WHERE ACA_ID = #{aca_id}
+		         GROUP BY ACA_ID) A,
+		       (SELECT COUNT(1) AS atd_cnt
+		          FROM TB_STD_ATD
+		         WHERE ACA_ID = #{aca_id}
+		           AND ATD_DT = (CASE WHEN DATE_FORMAT(NOW(), '%H%i') BETWEEN '0000' AND '0600' THEN DATE_FORMAT(DATE_ADD(NOW(), interval -1 day), '%Y-%m-%d')
+				                      ELSE DATE_FORMAT(NOW(), '%Y-%m-%d')
+				                      END)
+		           AND ATD_CD = '01'
+		           AND (LEAV_CD IS NULL OR LEAV_CD = '')) B,
+		       (SELECT COUNT(1) AS atd_cnt
+		          FROM TB_STD_ATD
+		         WHERE ACA_ID = #{aca_id}
+		           AND ATD_DT = (CASE WHEN DATE_FORMAT(NOW(), '%H%i') BETWEEN '0000' AND '0600' THEN DATE_FORMAT(DATE_ADD(NOW(), interval -1 day), '%Y-%m-%d')
+				                      ELSE DATE_FORMAT(NOW(), '%Y-%m-%d')
+				                      END)
+		           AND ATD_CD = '01'
+		           AND (LEAV_CD IS NULL OR LEAV_CD = '')
+		           AND (SEAT_NO IS NOT NULL OR SEAT_NO != '')) C
+	 </select>
+
+ 	<select id="getClassListRetrieve" parameterType="hashMap" resultType="hashMap">  
+	/* MainMapper.getClassListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			      TC.ACA_ID AS aca_id
+				, TC.CLASS_CD AS class_cd
+				, TC.CLASS_NM AS class_nm
+				, TC.CLASS_TP AS class_tp
+				, CONCAT(SCHD.STR_TM, ' ~ ', SCHD.END_TM) AS class_tm
+				, TC.SUBJECT_CD AS subject_cd
+				, FC_GET_ACA_CODE_NM(TC.ACA_ID, 'SUBJECT_CD', TC.SUBJECT_CD) AS subject_nm
+				, SCHD.ROOM_NO AS room_no
+				, TCR.ROOM_NM AS room_nm
+				, DATE_FORMAT(SCHD.LESSON_DT, '%w') AS wday
+				, SCHD.TEACHER_ID AS main_teacher_id
+				, TU1.USER_NM AS main_teacher_nm
+				, SCHD.TEACHER_ID2 AS sub_teacher_id
+				, TU2.USER_NM AS sub_teacher_nm
+				, NVL(CSL.APPLY_STD_CNT, 0) AS class_std_cnt
+				, NVL(SAD.ATD_CNT, 0) AS class_atd_cnt
+		FROM 	TB_CLASS TC
+				JOIN VW_ACA_CLASS_LESSON_DT SCHD ON SCHD.CLASS_CD = TC.CLASS_CD
+								AND SCHD.ACA_ID = TC.ACA_ID
+								AND SCHD.LESSON_DT =  DATE(NOW())
+				JOIN  TB_CLASS_ROOM TCR ON TCR.ACA_ID = TC.ACA_ID
+									AND TCR.ROOM_NO = SCHD.ROOM_NO
+				JOIN TB_USER TU1 ON TU1.USER_ID = SCHD.TEACHER_ID
+				LEFT OUTER JOIN TB_USER TU2 ON TU2.USER_ID = SCHD.TEACHER_ID2        
+				LEFT OUTER JOIN (
+					SELECT 	CLASS_CD, COUNT(DISTINCT V.STD_ID) AS APPLY_STD_CNT
+					FROM 	(
+								SELECT 	CLASS_CD, STD_ID
+								FROM 	TB_CLASS_STD 								
+								WHERE 1=1
+								AND	CLASS_APPLY_STATUS = '01' 
+								UNION 	ALL
+								SELECT 	CLASS_CD, STD_ID
+								FROM	TB_STD_ATD 
+								WHERE 1=1
+								AND	ATD_DT = DATE(NOW())
+								AND 	ATD_GB = 'S'
+							) V    
+							JOIN TB_STD_INFO TSI ON TSI.STD_ID = V.STD_ID
+												<!-- AND TSI.STD_STATUS IN ('01', '04', '06', '07') -->
+												AND FN_GET_ACA_STD_STATUS(TSI.ACA_ID, TSI.STD_ID) IN ('01', '04', '06', '07')
+					GROUP	BY CLASS_CD
+				) CSL ON CSL.CLASS_CD = TC.CLASS_CD        
+				LEFT OUTER JOIN (
+						SELECT  CLASS_CD, COUNT(1) AS ATD_CNT
+						FROM 	TB_STD_ATD
+						WHERE	ATD_DT = DATE(NOW()) 
+						AND 	ATD_CD IN ('01', '02')
+						GROUP	BY CLASS_CD   
+				) SAD ON SAD.CLASS_CD = TC.CLASS_CD
+		WHERE TC.ACA_ID = #{aca_id}
+		AND DATE(NOW()) BETWEEN TC.CLASS_SDT AND TC.CLASS_EDT
+		AND TC.CLASS_STATUS IN ('01', '02')
+		AND TC.USE_YN = 'Y'
+		<if test="emp_id != '' and emp_id != null">
+			AND SCHD.TEACHER_ID = #{emp_id}
+		</if>
+		<choose>
+			<when test="sidx != ''">
+				ORDER BY ${sidx} ${sord}
+			</when>
+			<otherwise>
+				ORDER BY 1, 2
+			</otherwise>
+		</choose>
+		LIMIT ${start}, ${end}
+	</select>
+
+	<select id="getClassStdListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* MainMapper.getClassStdListRetrieve */
+		SELECT DISTINCT
+			  TSI.ACA_ID AS aca_id
+			, TA.ACA_NM AS aca_nm
+			, TCS.STD_ID AS std_id
+			, TSI.STD_NM AS std_nm
+			, TU.HP_NO AS hp_no
+			, CASE NVL(SAD.ATD_CD, 'X') WHEN  '01' THEN CONCAT('등원 (', DATE_FORMAT(NVL(SAD.ATD_CHK_DTTM, NOW()), '%H:%i'), ')')
+					WHEN '02'	THEN '지각'
+					WHEN '03'	THEN '결석'
+					WHEN 'X'	THEN '미등원'
+					ELSE ''  END 	AS atd_status
+		FROM 	
+			(
+				SELECT 	
+					DATE(NOW()) AS LESSON_DT, CLASS_CD, STD_ID
+				FROM
+					TB_CLASS_STD T1
+				WHERE T1.CLASS_APPLY_STATUS = '01'
+		      UNION  ALL
+				SELECT 	
+					ATD_DT, CLASS_CD, STD_ID
+				FROM
+					TB_STD_ATD
+				WHERE 1=1
+				AND
+					ATD_DT = DATE(NOW())
+				AND
+					ATD_GB = 'S'  
+		) TCS 
+		JOIN TB_STD_INFO TSI
+				ON TSI.STD_ID = TCS.STD_ID
+				<!-- AND TSI.STD_STATUS IN ('01', '04', '06', '07') -->
+				AND FN_GET_ACA_STD_STATUS(TSI.ACA_ID, TSI.STD_ID) IN ('01', '04', '06', '07')
+		JOIN TB_ACA TA ON TA.ACA_ID = TSI.ACA_ID
+		JOIN TB_USER TU ON TU.USER_ID = TSI.STD_ID
+		LEFT OUTER JOIN 
+			TB_STD_ATD SAD
+				ON SAD.CLASS_CD = TCS.CLASS_CD
+				AND SAD.STD_ID = TCS.STD_ID
+				AND SAD.ATD_DT = TCS.LESSON_DT 
+		WHERE
+			TCS.CLASS_CD = #{class_cd}		
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY CASE WHEN TSI.ACA_ID = #{aca_id} THEN 0 ELSE 1 END ASC
+				, TA.ACA_NM ASC
+				, TSI.STD_NM ASC
+       		</otherwise>
+      	</choose>
+	</select>
+
+	<select id="getNoticeListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* MainMapper.getNoticeListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   SEQ AS board_seq
+			 , CASE WHEN ACA_ID = #{p_aca_id} THEN CONCAT(FC_GET_CODE_NM('BOARD_TP', BOARD_TP), ' [본사]')
+                ELSE FC_GET_CODE_NM('BOARD_TP', BOARD_TP)
+                END AS board_tp
+		     , TITLE AS board_title
+		     , IFNULL(VIEW_CNT, 0) AS board_view_cnt
+		  FROM TB_BOARD
+		 WHERE USE_YN = 'Y'
+		   AND BOARD_TP = '001'
+		   AND ACA_ID IN (#{p_aca_id}, #{aca_id})
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+	  	 LIMIT ${start}, ${end}
+	 </select>
+
+	<select id="getBoardDataFileListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* MainMapper.getBoardDataFileListRetrieve */
+ 		SELECT A.TITLE AS board_file_title
+		     , A.CONTS AS board_file_conts
+		     , DATE_FORMAT(A.ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS ent_file_dttm
+		     , DATE_FORMAT(A.UPT_DTTM, '%Y-%m-%d %H:%i:%s') AS upt_file_dttm
+		  FROM TB_BOARD A
+		  LEFT OUTER JOIN TB_BOARD_FILE B
+		    ON A.SEQ = B.BLBD_SQ
+ 	 	WHERE 1=1
+ 	 	  AND A.SEQ = #{blbd_sq}
+		 ORDER BY B.FILE_SEQ DESC
+	</select>
+
+	<update id="boardDataCntUpdate" parameterType="hashMap">
+	/* MainMapper.boardDataCntUpdate */
+		UPDATE TB_BOARD
+		   SET VIEW_CNT = (SELECT IFNULL(A.VIEW_CNT,0) + 1 FROM TB_BOARD A WHERE A.SEQ = #{blbd_sq})
+		   	 , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		WHERE SEQ = #{blbd_sq}
+	</update>
+
+	<select id="getAcaUseStatusRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* MainMapper.getAcaUseStatusRetrieve */
+       		SELECT A.CODE AS stat_gb_member
+			 , A.CODE_NM AS stat_gb_nm
+			 , A.STD_CNT1 AS std_cnt1
+			 , A.STD_CNT2 AS std_cnt2
+			 , A.STD_CNT3 AS std_cnt3
+			 , A.STD_CNT4 AS std_cnt4
+			 , A.STD_CNT5 AS std_cnt5
+			 , A.STD_CNT6 AS std_cnt6
+			 , A.STD_CNT7 AS std_cnt7
+			 , A.STD_CNT8 AS std_cnt8
+			 , A.STD_CNT9 AS std_cnt9
+			 , A.STD_CNT10 AS std_cnt10
+			 , A.STD_CNT11 AS std_cnt11
+			 , A.STD_CNT12 AS std_cnt12
+			 , (A.STD_CNT1 + A.STD_CNT2 + A.STD_CNT3 + A.STD_CNT4 + A.STD_CNT5 + A.STD_CNT6 + A.STD_CNT7 + A.STD_CNT8 + A.STD_CNT9 + A.STD_CNT10 + A.STD_CNT11 + A.STD_CNT12) AS stat_gb_sum
+		  FROM (SELECT T1.CODE
+				     , T1.CODE_NM
+				     , NVL((SELECT SUM(STD_CNT1) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT1
+				     , NVL((SELECT SUM(STD_CNT2) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT2
+				     , NVL((SELECT SUM(STD_CNT3) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT3
+				     , NVL((SELECT SUM(STD_CNT4) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT4
+				     , NVL((SELECT SUM(STD_CNT5) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT5
+				     , NVL((SELECT SUM(STD_CNT6) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT6
+				     , NVL((SELECT SUM(STD_CNT7) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT7
+				     , NVL((SELECT SUM(STD_CNT8) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT8
+				     , NVL((SELECT SUM(STD_CNT9) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT9
+				     , NVL((SELECT SUM(STD_CNT10) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT10
+				     , NVL((SELECT SUM(STD_CNT11) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT11
+				     , NVL((SELECT SUM(STD_CNT12) FROM TB_STAT_ACA_YEAR_MEMBER WHERE YEAR = DATE_FORMAT(NOW(), '%Y') AND ACA_ID = #{aca_id} AND STAT_GB_MEMBER = T1.CODE GROUP BY STAT_GB_MEMBER),0) AS STD_CNT12
+				  FROM (SELECT CODE, CODE_NM FROM TB_CODE WHERE CODE_GRP_CD = 'STAT_GB_MEMBER' AND USE_YN = 'Y' AND CODE != 'CODE') T1) A
+	</select>
+
+	<select id="teacherList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		   SELECT T1.USER_ID AS teacher_id
+           		, T1.USER_NM AS teacher_nm
+  			 FROM TB_USER T1
+        	 JOIN TB_EMP T2
+        	   ON T2.EMP_ID = T1.USER_ID
+        	 JOIN TB_USER_TP_AUTH_GRP T3
+        	   ON T3.USER_ID = T1.USER_ID
+               AND T3.AUTH_GRP_CD = 'AG0102'
+ 			WHERE T1.ACA_ID  = #{aca_id}
+   			  AND T1.USE_YN = 'Y'
+   			  AND T2.EMP_TP IN ('01', '02')
+   			ORDER BY T1.USER_NM
+	</select>
+	
+	<select id="smsPayInvCheck" parameterType="hashMap" resultType="hashMap">
+		SELECT  TT.ACA_ID, TT.ACA_NM
+                , NVL(TT.SUCC_SM_AMT, 0)+ NVL(TT.SUCC_LM_AMT, 0)     					AS AMT
+                , ROUND((NVL(TT.SUCC_SM_AMT, 0) + NVL(TT.SUCC_LM_AMT, 0)) * 0.1, 0)    	AS VAT
+                , NVL(TT.SUCC_SM_AMT, 0)+ NVL(TT.SUCC_LM_AMT, 0)     					
+                  + ROUND((NVL(TT.SUCC_SM_AMT, 0) + NVL(TT.SUCC_LM_AMT, 0)) * 0.1, 0)    	AS TOT_AMT 
+                , TT.REQ_CNT
+                , TT.SM_CNT
+                , TT.LM_CNT
+                , TT.SUCC_CNT
+                , TT.SUCC_SM_CNT
+                , TT.SUCC_LM_CNT        
+                , CONCAT(DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m'), '-01')    AS FROM_DT
+                , DATE_FORMAT(LAST_DAY(DATE_SUB(NOW(), INTERVAL 1 MONTH)), '%Y-%m-%d')      AS TO_DT
+          FROM  (        
+                SELECT T2.ACA_ID, T2.ACA_NM, T2.BIZ_NM, T2.BIZ_NO, T2.BOSS_NM, T2.TEL_NO, T2.EMAIL
+                        , T2.ADDR, T2.ADDR_DTL, T2.ACA_TP
+                        , COUNT(1)  AS REQ_CNT
+                        , NVL(SUM(CASE WHEN MT_TYPE = 'SM' THEN 1 ELSE NULL END), 0)          AS SM_CNT
+                        , NVL(SUM(CASE WHEN MT_TYPE = 'LM' THEN 1 ELSE NULL END), 0)          AS LM_CNT
+                        , NVL(SUM(CASE WHEN T1.STATUS = '3' THEN 1 ELSE NULL END), 0) AS SUCC_CNT
+                        , NVL(SUM(CASE WHEN T1.STATUS = '3' THEN 
+                                        CASE WHEN MT_TYPE = 'SM' THEN 1 ELSE NULL END
+                                    ELSE NULL END), 0)                                  AS SUCC_SM_CNT
+                        , NVL(SUM(CASE WHEN T1.STATUS = '3' THEN 
+                                        CASE WHEN MT_TYPE = 'LM' THEN 1 ELSE NULL END
+                                    ELSE NULL END), 0)                                  AS SUCC_LM_CNT
+                        , NVL(SUM(CASE WHEN T1.STATUS = '3' THEN 
+                                        CASE WHEN MT_TYPE = 'SM' THEN 1 ELSE NULL END
+                                    ELSE NULL END), 0)   * 10                               AS SUCC_SM_AMT
+                        , NVL(SUM(CASE WHEN T1.STATUS = '3' THEN 
+                                        CASE WHEN MT_TYPE = 'LM' THEN 1 ELSE NULL END
+                                    ELSE NULL END), 0)  * 28                                AS SUCC_LM_AMT
+                  FROM  TB_ACA T2 
+                        LEFT OUTER JOIN TB_SMS T1   ON  T1.ACA_ID = T2.ACA_ID                
+                                                    AND T1.REQUEST_DATE BETWEEN CONCAT( DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m'), '-01')
+                                                                            AND LAST_DAY(DATE_SUB(NOW(), INTERVAL 1 MONTH)) 
+                 WHERE  T1.ACA_ID = #{aca_id}
+                   AND  T2.CONT_STAT = '00'
+                   AND  T2.USE_YN = 'Y' 
+                 GROUP  BY T1.ACA_ID, T2.ACA_NM  ) TT
+	
+	</select>
+	
+	<insert id="smsPayReadCreate" parameterType="hashMap">
+		INSERT INTO TB_NOTI_READ(NOTI_SEQ             , USER_ID             , READ_DTTM)
+             VALUES (DATE_FORMAT(NOW(), '%Y%m%d%H%i%m'), CONCAT(#{aca_id}, #{user_id}, DATE_FORMAT(NOW(), '%Y%m'))        , NOW())
+	</insert>
+	<select id="smsPayReadCheck" parameterType="hashMap" resultType="int">
+		 SELECT COUNT(*) as cnt 
+		   FROM TB_NOTI_READ
+          WHERE user_id = CONCAT(#{aca_id}, #{user_id}, DATE_FORMAT(NOW(), '%Y%m'));
+	</select>
+</mapper>

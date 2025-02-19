@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/default}" layout:fragment="Content">
+  <head>
+    <title>센터정보관리</title>
+    <script src="/vendors/tinymce/tinymce.min.js"></script>
+    <script src="/vendors/datatables.net/dataTables.min.js"></script>
+    <script src="/vendors/datatables.net-bs5/dataTables.bootstrap5.min.js"></script>
+    <script src="/vendors/datatables.net-fixedcolumns/dataTables.fixedColumns.min.js"></script>
+    <script src="/vendors/dropzone/dropzone-min.js"></script>
+    <script src="/js/jquery.form.js"></script>
+    <link rel="stylesheet" href="/vendors/datatables.net-bs5/dataTables.bootstrap5.min.css" />
+    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  </head>
+  <script>
+    $(function () {
+      $("#frm_aca_info").onLoadFunction();
+      // 공통코드 조회
+      callAjax("/common/common/totalCodelist", "CODE_GRP_CD=('ACA_TP', 'VAN_CD', 'GOODS_TP', 'POS_TP', 'TAX_TP', 'SUBJECT_CD', 'GOODS_UNIT_TP', 'GOODS_PAY_CALC_TP','SCH_EDU_MGT_CD', 'ITEM_TP')", fn_code_setting);
+
+      function fn_code_setting(data) {
+        codeSetting("ACA_TP", data.data, "#aca_tp", "1", "", "");
+        codeSetting("VAN_CD", data.data, "#pos_van_cd", "1", "", "");
+        codeSetting("TAX_TP", data.data, "#gds_tax_tp", "1", "", "");
+        codeSetting("GOODS_TP", data.data, "#gds_goods_tp", "1", "", "");
+        codeSetting("POS_TP", data.data, "#pos_tp", "1", "", "");
+        codeSetting("SUBJECT_CD", data.data, "#mng_subject_cd", "1", "", "");
+        codeSetting("GOODS_UNIT_TP", data.data, "#gds_unit_tp", "1", "", "");
+        codeSetting("GOODS_PAY_CALC_TP", data.data, "#gds_pay_calc_tp", "1", "", "");
+        codeSetting("SCH_EDU_MGT_CD", data.data, "#office_of_education", "1", "", "");
+        codeSetting("GOODS_TP", data.data, "#srch_goods_tp", "1", "", "");
+        codeSetting("ITEM_TP", data.data, "#item_tp", "1", "", "");
+
+        // 캠퍼스정보 조회
+        callAjax("/center/center/centerInfoMng/getCenterInfoRetrieve", "", function (data) {
+          if (data.data != null) {
+            $("#aca_id").val(data.data.aca_id);
+            $("#aca_nm").val(data.data.aca_nm);
+            $("#aca_tp").val(data.data.aca_tp).prop("selected", true);
+            $("#aca_jisa_nm").val(data.data.jisa_nm);
+            $("#aca_open_tm").val(data.data.open_tm);
+            $("#aca_close_tm").val(data.data.close_tm);
+            $("input:radio[name=aca_use_yn][value=" + data.data.use_yn + "]").prop("checked", true);
+            $("#aca_hompage").val(data.data.hompage);
+            $("#aca_boss_id").val(data.data.boss_id);
+            $("#aca_boss_nm").val(data.data.boss_nm);
+            $("#aca_biz_no").val(data.data.biz_no);
+            $("#aca_tel_no").val(data.data.tel_no);
+            $("#aca_mobile").val(data.data.mobile);
+            $("#aca_email").val(data.data.email);
+            $("#aca_addr").val(data.data.addr);
+            $("#aca_addr_dtl").val(data.data.addr_dtl);
+            $("#aca_ent_dttm").val(data.data.ent_dttm);
+            $("#aca_upt_dttm").val(data.data.upt_dttm);
+            $("#aca_ent_user_id").val(data.data.ent_user_id);
+            $("#aca_upt_user_id").val(data.data.upt_user_id);
+            $("#aca_pcode_use_yn").val(data.data.pcode_use_yn);
+
+            $("#homepage_url").val(data.data.homepage_url);
+
+            /* 코드관리 신규 저장버튼 */
+            if (data.data.pcode_use_yn == "Y") {
+              $("#btn_code_update").show();
+              $("#btn_code_clear").show();
+            } else {
+              $("#btn_code_update").hide();
+              $("#btn_code_clear").hide();
+            }
+          }
+        });
+      }
+      var tbl_cls_room_list = $("#tbl_cls_room_list").DataTable({
+        processing: true,
+        serverSide: true,
+        select: true,
+        responsive: true,
+        paging: true,
+        lengthChange: false,
+        searching: false,
+        ordering: true,
+        autoWidth: false,
+        responsive: true,
+        scrollCollapse: true,
+        pageLength: 10,
+        info: false,
+        language: {
+          emptyTable: "데이터가 없습니다.",
+          search: "검색:",
+          zeroRecords: "일치하는 데이터가 없습니다.",
+          loadingRecords: "로딩중...",
+          processing: "처리중...",
+        },
+        ajax: {
+          url: "/center/center/centerInfoMng/getClsRoomListRetrieve",
+          contentType: "application/json",
+          type: "POST",
+          data: function (postData) {
+            formData = $("#aca_id").serializeObject();
+            Object.assign(postData, formData);
+            return JSON.stringify(postData);
+          },
+        },
+        columns: [{ data: "cls_room_nm" }, { data: "cls_seat_cnt" }, { data: "cls_use_yn_nm" }],
+      });
+
+      $("#btn_aca_update").click(function () {
+        $("input:radio[name=pcode_use_yn]").removeAttr("disabled");
+        var form = $("#frm_aca_info");
+        var formData = form.serializeObject();
+        var checked = true;
+        $.each(form, function (i, val) {
+          if (!val.checkValidity()) {
+            checked = false;
+          }
+        });
+        if (checked) {
+          ConfirmdialogToAjax("update", "/center/center/centerInfoMng/centerUpdate", formData, fn_return_acaUpdate);
+        }
+      });
+      function fn_return_acaUpdate(data) {
+        var resultCode = data.resultCode;
+        var resultMsg = data.resultMsg;
+        $("#frm_aca_info")[0].reset();
+
+        if (resultCode == "S000") {
+          swal("성공", "작업을 정상적으로 완료하였습니다.", "success");
+
+          $("#aca_boss_hp_chg").val("N");
+
+          // 캠퍼스정보 조회
+          callAjax("/center/center/centerInfoMng/getCenterInfoRetrieve", "", function (data) {
+            if (data.data != null) {
+              $("#aca_id").val(data.data.aca_id);
+              $("#aca_nm").val(data.data.aca_nm);
+              $("#aca_tp").val(data.data.aca_tp).prop("selected", true);
+              $("#aca_jisa_nm").val(data.data.jisa_nm);
+              $("#aca_open_tm").val(data.data.open_tm);
+              $("#aca_close_tm").val(data.data.close_tm);
+              $("input:radio[name=aca_use_yn][value=" + data.data.use_yn + "]").prop("checked", true);
+              $("#aca_hompage").val(data.data.hompage);
+              $("#aca_boss_id").val(data.data.boss_id);
+              $("#aca_boss_nm").val(data.data.boss_nm);
+              $("#aca_biz_no").val(data.data.biz_no);
+              $("#aca_tel_no").val(data.data.tel_no);
+              $("#aca_mobile").val(data.data.mobile);
+              $("#aca_email").val(data.data.email);
+              $("#aca_addr").val(data.data.addr);
+              $("#aca_addr_dtl").val(data.data.addr_dtl);
+              $("#aca_ent_dttm").val(data.data.ent_dttm);
+              $("#aca_upt_dttm").val(data.data.upt_dttm);
+              $("#aca_ent_user_id").val(data.data.ent_user_id);
+              $("#aca_upt_user_id").val(data.data.upt_user_id);
+              $("input:radio[name=pcode_use_yn]").attr("disabled", "disabled");
+            }
+          });
+        }
+      }
+    });
+  </script>
+  <div class="content">
+    <div class="row g-0">
+      <div class="card">
+        <div class="card-header py-2"><h5>학원 정보</h5></div>
+        <div class="card-body bg-body-tertiary">
+          <form class="needs-validation" id="frm_aca_info" name="frm_aca_info" onsubmit="return false;" novalidate="">
+            <input type="hidden" id="aca_boss_id" name="aca_boss_id" />
+            <input type="hidden" id="aca_zip_no" name="aca_zip_no" />
+            <input type="hidden" id="aca_boss_hp_chg" name="aca_boss_hp_chg" value="N" />
+            <input type="hidden" name="p_aca_id" id="p_aca_id" value="${sessionVo.p_aca_id}" />
+            <input type="hidden" name="sms_uid" id="sms_uid" />
+            <div class="row py-1">
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">캠퍼스코드</label>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" id="aca_id" name="aca_id" readonly="readonly" required />
+              </div>
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">캠퍼스명</label>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" id="aca_nm" name="aca_nm" readonly="readonly" required />
+              </div>
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">캠퍼스유형</label>
+              <div class="col-md-3">
+                <select class="form-control form-control-sm" id="aca_tp" name="aca_tp"></select>
+              </div>
+            </div>
+            <div class="row py-1">
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">대표자명</label>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" id="aca_boss_nm" name="aca_boss_nm" readonly="readonly" required />
+              </div>
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">사업자번호</label>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" id="aca_biz_no" name="aca_biz_no" readonly="readonly" required />
+              </div>
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">관리본부</label>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" id="aca_jisa_nm" name="aca_jisa_nm" readonly="readonly" required />
+              </div>
+            </div>
+            <div class="row py-1">
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">전화번호</label>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" id="aca_tel_no" name="aca_tel_no" istyle="phone" maxlength="13" required />
+              </div>
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">Mobile</label>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" id="aca_mobile" name="aca_mobile" istyle="phone" maxlength="13" required />
+              </div>
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">eMail</label>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" id="aca_email" name="aca_email" istyle="email" />
+              </div>
+            </div>
+            <div class="row py-1">
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">주소</label>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" id="aca_addr" name="aca_addr" readonly="readonly" onclick="openZipSearch();" />
+              </div>
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">운영시간</label>
+              <div class="col-md-1">
+                <input type="text" class="form-control form-control-sm" id="aca_open_tm" name="aca_open_tm" data-mask="99:99" istyle="clock" />
+              </div>
+              <div class="col-md-1">
+                <input type="text" class="form-control form-control-sm" id="aca_close_tm" name="aca_close_tm" data-mask="99:99" istyle="clock" />
+              </div>
+              <label class="col-md-2 control-label">homePage</label>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" id="aca_hompage" name="aca_hompage" />
+              </div>
+            </div>
+            <div class="row py-1">
+              <label class="col-md-1 col-form-label col-form-label-sm text-end"></label>
+              <div class="col-md-3">
+                <input type="text" class="form-control form-control-sm" id="aca_addr_dtl" name="aca_addr_dtl" />
+              </div>
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">계약</label>
+              <div class="col-md-3">
+                <label class="radio radio-inline">
+                  <input type="radio" class="radiobox" name="aca_use_yn" value="Y" disabled />
+                  <span>사용</span>
+                </label>
+                <label class="radio radio-inline">
+                  <input type="radio" class="radiobox" name="aca_use_yn" value="N" disabled />
+                  <span>미사용</span>
+                </label>
+              </div>
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">공통코드</label>
+              <div class="col-md-3">
+                <label class="radio radio-inline">
+                  <input type="radio" class="radiobox" name="pcode_use_yn" value="Y" disabled="disabled" />
+                  <span>자체 코드</span>
+                </label>
+                <label class="radio radio-inline">
+                  <input type="radio" class="radiobox" name="pcode_use_yn" value="N" disabled="disabled" />
+                  <span>본사 코드 사용</span>
+                </label>
+              </div>
+            </div>
+            <div class="row py-1">
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">입력자 / 시간</label>
+              <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control form-control-sm" name="aca_ent_user_id" id="aca_ent_user_id" readonly="readonly" />
+                  <span class="input-group-addon" style="">/</span>
+                  <input type="text" class="form-control form-control-sm" name="aca_ent_dttm" id="aca_ent_dttm" readonly="readonly" />
+                </div>
+              </div>
+              <label class="col-md-1 col-form-label col-form-label-sm text-end">수정자 / 시간</label>
+              <div class="col-md-3">
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control form-control-sm" name="aca_upt_user_id" id="aca_upt_user_id" readonly="readonly" />
+                  <span class="input-group-addon" style="">/</span>
+                  <input type="text" class="form-control form-control-sm" name="aca_upt_dttm" id="aca_upt_dttm" readonly="readonly" />
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="card-footer py-2">
+          <div class="row">
+            <div class="col-md-12 text-end">
+              <button class="btn btn-primary me-1 mb-1" id="btn_aca_update"><i class="fa fa-paste"></i> <strong>저장</strong></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-0 py-1" style="display: none">
+      <div class="card">
+        <div class="card-header p-0 scrollbar">
+          <ul class="nav nav-tabs border-0 tab-tickets-status flex-nowrap" id="in-depth-chart-tab" role="tablist">
+            <ul class="nav nav-tabs border-0 tab-tickets-status flex-nowrap" id="in-depth-chart-tab" role="tablist">
+              <li class="nav-item text-nowrap" role="presentation">
+                <a class="nav-link mb-0 d-flex align-items-center gap-2 py-3 px-x1 active" id="tickets-created-tab" data-bs-toggle="tab" href="#tab_1" role="tab" aria-controls="tickets-created" aria-selected="true">
+                  <h6 class="mb-0 text-600">강의실 정보</h6>
+                </a>
+              </li>
+              <li class="nav-item text-nowrap" role="presentation">
+                <a class="nav-link mb-0 d-flex align-items-center gap-2 py-3 px-x1" id="tickets-resolved-tab" data-bs-toggle="tab" href="#tab_2" role="tab" aria-controls="tickets-resolved" aria-selected="false">
+                  <h6 class="mb-0 text-600">관리그룹</h6>
+                </a>
+              </li>
+              <li class="nav-item text-nowrap" role="presentation">
+                <a class="nav-link mb-0 d-flex align-items-center gap-2 py-3 px-x1" id="tickets-unsolved-tab" data-bs-toggle="tab" href="#tab_4" role="tab" aria-controls="tickets-unsolved" aria-selected="false">
+                  <h6 class="mb-0 text-600">코드관리</h6>
+                </a>
+              </li>
+              <li class="nav-item text-nowrap" role="presentation">
+                <a class="nav-link mb-0 d-flex align-items-center gap-2 py-3 px-x1" id="tickets-reopened-tab" data-bs-toggle="tab" href="#tab_9" role="tab" aria-controls="tickets-reopened" aria-selected="false">
+                  <h6 class="mb-0 text-600">계약정보</h6>
+                </a>
+              </li>
+            </ul>
+          </ul>
+        </div>
+        <div class="card-body p-0">
+          <div class="tab-content">
+            <div class="tab-pane active" id="tab_1" role="tabpanel" aria-labelledby="tickets-created-tab">
+              <div class="row mx-0">
+                <div class="col-md-6 p-x1 border-end-md border-dashed">
+                  <div id="DataTables_Table_0_wrapper" class="dt-container dt-bootstrap5 dt-empty-footer">
+                    <div class="table-responsive scrollbar">
+                      <table class="table table-sm table-striped table-bordered table-hover fs-10 mb-0" id="table_exam_list">
+                        <thead class="bg-200">
+                          <tr>
+                            <th class="text-900">독서레벨</th>
+                            <th class="text-900">교재명</th>
+                            <th class="text-900">평가일</th>
+                            <th class="text-900">어휘</th>
+                            <th class="text-900">사실</th>
+                            <th class="text-900">추론</th>
+                            <th class="text-900">비판</th>
+                            <th class="text-900">점수</th>
+                            <th class="text-900">상세</th>
+                          </tr>
+                        </thead>
+                        <tbody></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6 p-x1 border-bottom border-bottom-md-0 border-dashed">
+                  <div class="card">
+                    <div class="card-body bg-body-tertiary py-1">
+                      <form class="needs-validation" id="frm_cls_info" name="frm_cls_info" onsubmit="return false;" novalidate="">
+                        <input type="hidden" name="cls_state" id="cls_state" />
+                        <input type="hidden" name="cls_room_no" id="cls_room_no" />
+                        <fieldset>
+                          <div class="row py-1">
+                            <label class="col-md-3 col-form-label col-form-label-sm text-end">강의실 유형</label>
+                            <div class="col-md-3">
+                              <label class="radio radio-inline">
+                                <input type="radio" class="radiobox" name="cls_room_tp" value="1" checked onchange="class_room_type(this.value);" />
+                                <span>강의실</span>
+                              </label>
+                              <label class="radio radio-inline">
+                                <input type="radio" class="radiobox" name="cls_room_tp" value="2" onchange="class_room_type(this.value);" />
+                                <span>독서실</span>
+                              </label>
+                            </div>
+                          </div>
+                          <div class="row py-1">
+                            <label class="col-md-3 col-form-label col-form-label-sm text-end">강의실명</label>
+                            <div class="col-md-7">
+                              <input type="text" class="form-control form-control-sm" name="cls_room_nm" id="cls_room_nm" />
+                            </div>
+                          </div>
+                          <div class="row py-1">
+                            <label class="col-md-3 col-form-label col-form-label-sm text-end">좌석수</label>
+                            <div class="col-md-4">
+                              <input type="text" class="form-control form-control-sm" name="cls_seat_cnt" id="cls_seat_cnt" />
+                            </div>
+                            <div class="col-md-3">
+                              <input type="color" id="color" name="color" value="" style="height: 27px; width: 80px; padding: 0" />
+                            </div>
+                          </div>
+                          <div class="form-group" id="seat_cnt" style="display: none">
+                            <label class="col-md-3 col-form-label col-form-label-sm text-end">좌석시작번호</label>
+                            <div class="col-md-4">
+                              <input type="text" class="form-control form-control-sm" name="cls_seat_start_num" id="cls_seat_start_num" onchange="fn_clsSeatStartNumChange(this)" />
+                            </div>
+                          </div>
+                          <div class="row py-1">
+                            <label class="col-md-3 col-form-label col-form-label-sm text-end">사용여부</label>
+                            <div class="col-md-7">
+                              <label class="radio radio-inline">
+                                <input type="radio" class="radiobox" name="cls_use_yn" value="Y" />
+                                <span>사용</span>
+                              </label>
+                              <label class="radio radio-inline">
+                                <input type="radio" class="radiobox" name="cls_use_yn" value="N" />
+                                <span>미사용</span>
+                              </label>
+                            </div>
+                          </div>
+                          <div class="row py-1">
+                            <label class="col-md-3 col-form-label col-form-label-sm text-end">수정자</label>
+                            <div class="col-md-7">
+                              <input type="text" class="form-control form-control-sm" id="cls_upt_user_id" name="cls_upt_user_id" readonly="readonly" />
+                            </div>
+                          </div>
+                          <div class="row py-1">
+                            <label class="col-md-3 col-form-label col-form-label-sm text-end">수정일시</label>
+                            <div class="col-md-7">
+                              <input type="text" class="form-control form-control-sm" id="cls_upt_dttm" name="cls_upt_dttm" readonly="readonly" />
+                            </div>
+                          </div>
+                        </fieldset>
+                        <div class="row py-1">
+                          <div class="col-md-12 text-end">
+                            <button class="btn btn-primary btn-sm" id="btn_cls_clear"><i class="fa fa-check"></i> <strong>신규</strong></button>
+                            <button class="btn btn-info btn-sm" id="btn_cls_update" style="display: none"><i class="fa fa-paste"></i> <strong>저장</strong></button>
+                            <button class="btn btn-info btn-sm" id="btn_cls_create"><i class="fa fa-paste"></i> <strong>저장</strong></button>
+                          </div>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</html>

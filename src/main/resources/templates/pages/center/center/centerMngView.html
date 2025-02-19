@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/default}" layout:fragment="Content">
+  <head>
+    <title>가맹 센터 관리</title>
+    <script src="/vendors/tinymce/tinymce.min.js"></script>
+    <script src="/vendors/datatables.net/dataTables.min.js"></script>
+    <script src="/vendors/datatables.net-bs5/dataTables.bootstrap5.min.js"></script>
+    <script src="/vendors/datatables.net-fixedcolumns/dataTables.fixedColumns.min.js"></script>
+    <script src="/vendors/dropzone/dropzone-min.js"></script>
+    <script src="/js/jquery.form.js"></script>
+    <link rel="stylesheet" href="/vendors/datatables.net-bs5/dataTables.bootstrap5.min.css" />
+    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  </head>
+  <script>
+    $(function () {
+      // 공통코드 조회
+      callAjax('/common/common/totalCodelist', "CODE_GRP_CD=('CONT_GB', 'SALES_GRADE', 'ACA_TP')", fn_code_setting);
+
+      function fn_code_setting(data) {
+        codeSetting('CONT_STAT', data.data, '#cont_stat', '1', '', '');
+        codeSetting('SALES_GRADE', data.data, '#sales_grade', '1', '', '');
+        codeSetting('ACA_TP', data.data, '#aca_tp', '1', '', '');
+      }
+      // 센터 리스트 조회
+      var tbl_center_list = $('#tbl_center_list').DataTable({
+        processing: true,
+        serverSide: true,
+        select: true,
+        responsive: true,
+        paging: true,
+        lengthChange: false,
+        searching: false,
+        ordering: true,
+        autoWidth: false,
+        responsive: true,
+        scrollCollapse: true,
+        pageLength: 20,
+        info: false,
+        language: {
+          emptyTable: '데이터가 없습니다.',
+          search: '검색:',
+          zeroRecords: '일치하는 데이터가 없습니다.',
+          loadingRecords: '로딩중...',
+          processing: '처리중...',
+        },
+        ajax: {
+          url: '/center/center/centerMng/getCenterMngListRetrieve',
+          contentType: 'application/json',
+          type: 'POST',
+          data: function (postData) {
+            formData = $('#frm_center_srch').serializeObject();
+            Object.assign(postData, formData);
+            return JSON.stringify(postData);
+          },
+        },
+        columns: [{ data: 'aca_nm' }, { data: 'aca_id' }, { data: 'hp_no' }, { data: 'cont_stat_nm' }, { data: 'ent_user_id' }, { data: 'ent_dttm' }],
+      });
+      $('#tbl_center_list tbody').on('click', 'tr', function () {
+        $('#frm_center_info').clearForm();
+        var data = tbl_center_list.row(this).data();
+        $('#aca_id').val(data.aca_id);
+        $('#aca_nm').val(data.aca_nm);
+        $('#boss_id').val(data.boss_id);
+        $('#boss_nm').val(data.boss_nm);
+        $('#aca_tp').val(data.aca_tp);
+        $('#biz_nm').val(data.biz_nm);
+        $('#biz_no').val(data.biz_no);
+        $('#tel_no').val(data.tel_no);
+        $('#hp_no').val(data.hp_no);
+        $('#zip_no').val(data.zip_no);
+        $('#addr').val(data.addr);
+        $('#addr_dtl').val(data.addr_dtl);
+        $('#email').val(data.email);
+        $('#hompage').val(data.hompage);
+        $('#open_tm').val(data.open_tm);
+        $('#close_tm').val(data.close_tm);
+        $('#sales_grade').val(data.sales_grade);
+        $('#mig_a_code').val(data.mig_a_code);
+        $('#mig_home_code').val(data.mig_home_code);
+        $('input:radio[name=use_yn]:input[value=' + data.use_yn + ']').attr('checked', true);
+        $('#center_updt_gb').val('update');
+      });
+      /* 주소 검색 */
+      $('#addr').click(function () {
+        new daum.Postcode({
+          oncomplete: function (data) {
+            // 팝업에서 검색결과 항목을 클릭했을때 실행할 코드를 작성하는 부분.
+            var addr = ''; // 주소 변수
+
+            //사용자가 선택한 주소 타입에 따라 해당 주소 값을 가져온다.
+            if (data.userSelectedType === 'R') {
+              // 사용자가 도로명 주소를 선택했을 경우
+              addr = data.roadAddress;
+            } else {
+              // 사용자가 지번 주소를 선택했을 경우(J)
+              addr = data.jibunAddress;
+            }
+
+            // 우편번호와 주소 정보를 해당 필드에 넣는다.
+            $('#zip_no').val(data.zonecode);
+            $('#addr').val(addr);
+            $('#addr_dtl').focus();
+          },
+        }).open();
+      });
+      $('#btn_center_srch').click(function () {
+        tbl_center_list.ajax.reload();
+      });
+      $('#btn_center_update').click(function () {
+        var form = $('#frm_center_info');
+        var formData = form.serializeObject();
+        var checked = true;
+        $.each(form, function (i, val) {
+          if (!val.checkValidity()) {
+            checked = false;
+          }
+        });
+        if (checked) {
+          var crud = $('#center_updt_gb').val();
+          if (crud == 'create') {
+            ConfirmdialogToAjax('create', '/center/center/centerMng/centerInfoCreate', formData, fn_return_center_create);
+          } else if (crud == 'update') {
+            ConfirmdialogToAjax('update', '/center/center/centerMng/centerInfoUpdate', formData, fn_return_center_create);
+          }
+        }
+      });
+      function fn_return_center_create(data) {
+        var resultCode = data.resultCode;
+        var resultMsg = data.resultMsg;
+
+        if (resultCode == 'S000') {
+          swal('성공', '작업을 정상적으로 완료하였습니다.', 'success');
+          tbl_center_list.ajax.reload();
+          $('#frm_center_info').clearForm();
+
+          $('#center_updt_gb').val('create');
+
+          $('#boss_id').attr('readonly', false);
+          $('#user_pwd').removeAttr('disabled');
+          $('input:radio[name=cont_stat]').prop('checked', false);
+          $('input:radio[name=use_yn]').prop('checked', false);
+          $('input:radio[name=auth_yn]').prop('checked', false);
+        }
+      }
+      $('#btn_center_clear').click(function () {
+        local_aca_id = '';
+
+        $('#frm_center_info').clearForm();
+        $('#boss_id').attr('readonly', false);
+        $('#user_pwd').removeAttr('disabled');
+        $('input:radio[name=cont_stat]').prop('checked', false);
+        $('input:radio[name=use_yn]').prop('checked', false);
+        $('input:radio[name=auth_yn]').prop('checked', false);
+        $('#btn_boss_id_login').hide();
+        $('#btn_dup_cnfm').show();
+        $('#center_updt_gb').val('create');
+        $('#hd_dup_cnfm').val('N');
+      });
+
+      /* 아이디 중복 체크 */
+      $('#btn_dup_cnfm').click(function () {
+        if ($('#boss_id').val() == '') {
+          $('#boss_id').attr('style', 'border: solid red 2px;');
+          swal('경고', '아이디를 입력해주세요.', 'error');
+        } else {
+          callAjax('/center/user/userMng/checkUserId', 'user_id=' + $('#boss_id').val(), fn_return_usid);
+        }
+      });
+
+      /* 아이디 중복 체크 callback 함수*/
+      function fn_return_usid(data) {
+        var resultCode = data.resultCode;
+        var resultMsg = data.resultMsg;
+        var resultData = data.data;
+
+        if (resultCode == 'S000') {
+          swal('성공', resultMsg, 'success');
+          $('#hd_dup_cnfm').val('Y');
+          if (resultData == 1) {
+            $('#boss_id').val('');
+            swal('실패', resultMsg, 'error');
+            $('#hd_dup_cnfm').val('N');
+          }
+        }
+      }
+    });
+  </script>
+  <div class="content">
+    <div class="row g-0">
+      <div class="col-lg-6 pe-lg-2 mb-3">
+        <div class="card">
+          <div class="card-header"><h5>학원 리스트</h5></div>
+          <div class="card-body bg-body-tertiary">
+            <form class="form-horizontal" id="frm_center_srch" name="frm_center_srch">
+              <div class="row px-3 py-0">
+                <label class="col-md-1 col-form-label col-form-label-sm">상태</label>
+                <div class="col-md-3">
+                  <select class="form-control form-select form-select-sm" name="cont_stat" id="cont_stat"></select>
+                </div>
+                <label class="col-md-1 col-form-label col-form-label-sm">검색</label>
+                <div class="col-md-7">
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-btn">
+                      <select class="form-control form-select form-select-sm" id="srch_tp" name="srch_tp" style="width: 120px">
+                        <option value="name_tp" selected>캠퍼스명</option>
+                        <option value="id_tp">캠퍼스코드</option>
+                      </select>
+                    </span>
+                    <input type="text" class="form-control form-control-sm" id="srch_center_inp" name="srch_center_inp" />
+                    <button type="button" class="btn btn-primary btn-sm" id="btn_center_srch" name="btn_center_srch">조회</button>
+                  </div>
+                </div>
+              </div>
+            </form>
+            <hr />
+            <div id="DataTables_Table_0_wrapper" class="dt-container dt-bootstrap5 dt-empty-footer">
+              <div class="table-responsive scrollbar">
+                <table class="table table-sm table-striped table-bordered table-hover fs-10 mb-0" id="tbl_center_list">
+                  <thead class="bg-200">
+                    <tr>
+                      <th class="text-900">캠퍼스명</th>
+                      <th class="text-900">아이디</th>
+                      <th class="text-900">연락처</th>
+                      <th class="text-900">상태</th>
+                      <th class="text-900">등록자</th>
+                      <th class="text-900">등록일</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6 pe-lg-2 mb-3">
+        <div class="card">
+          <div class="card-header"><h5>학원 상세</h5></div>
+          <div class="card-body bg-body-tertiary">
+            <form id="frm_center_info" name="frm_center_info" class="needs-validation" onsubmit="return false;" novalidate="">
+              <input type="hidden" id="center_updt_gb" value="create" />
+              <input type="hidden" id="hd_dup_cnfm" value="N" />
+              <input type="hidden" id="cont_stat" name="cont_stat" value="00" />
+              <div class="row py-2">
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">캠퍼스코드</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" name="aca_id" id="aca_id" readonly="readonly" />
+                </div>
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">캠퍼스명</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" name="aca_nm" id="aca_nm" required />
+                </div>
+              </div>
+              <div class="row py-2">
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">대표계정</label>
+                <div class="col-md-4">
+                  <div class="input-group input-group-sm">
+                    <input type="text" class="form-control form-control-sm" name="boss_id" id="boss_id" required />
+                    <div class="input-group-btn">
+                      <button type="button" class="btn btn-primary btn-sm" id="btn_dup_cnfm"><i class="fa fa-check"></i> <strong>중복</strong></button>
+                      <button type="button" class="btn btn-primary btn-sm" id="btn_boss_id_login" style="display: none"><i class="fa fa-check"></i> <strong>아이디접속</strong></button>
+                    </div>
+                  </div>
+                </div>
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">비밀번호</label>
+                <div class="col-md-4">
+                  <input type="password" class="form-control form-control-sm" name="user_pwd" id="user_pwd" />
+                </div>
+              </div>
+              <div class="row py-2">
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">대표자명</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" name="boss_nm" id="boss_nm" required />
+                </div>
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">캠퍼스유형</label>
+                <div class="col-md-4">
+                  <select class="form-control form-select form-select-sm" id="aca_tp" name="aca_tp" required></select>
+                </div>
+              </div>
+              <div class="row py-2">
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">상호명</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" name="biz_nm" id="biz_nm" required />
+                </div>
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">사업자번호</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" name="biz_no" id="biz_no" placeholder="000-00-00000" />
+                </div>
+              </div>
+              <div class="row py-2">
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">전화번호</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" name="tel_no" id="tel_no" istyle="phone" maxlength="13" required />
+                </div>
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">핸드폰</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" name="hp_no" id="hp_no" istyle="phone" maxlength="13" required />
+                </div>
+              </div>
+              <div class="row py-2">
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">주소</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" id="addr" name="addr" readonly="readonly" />
+                </div>
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">우편번호</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" name="zip_no" id="zip_no" readonly="readonly" />
+                </div>
+              </div>
+              <div class="row py-2">
+                <label class="col-md-2 col-form-label col-form-label-sm"></label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" name="addr_dtl" id="addr_dtl" />
+                </div>
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">이메일</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" id="email" name="email" istyle="email" />
+                </div>
+              </div>
+              <div class="row py-2">
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">홈페이지</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" name="hompage" id="hompage" placeholder="https://www.xxxxx.com" />
+                </div>
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">운영시간</label>
+                <div class="col-md-4">
+                  <div class="input-group input-group-sm">
+                    <input type="text" class="form-control form-control-sm" name="open_tm" id="open_tm" data-placement="left" data-mask="99:99" istyle="clock" />
+                    <span class="input-group-addon" style="line-height: 0px">~</span>
+                    <input type="text" class="form-control form-control-sm" name="close_tm" id="close_tm" data-placement="left" data-mask="99:99" istyle="clock" />
+                  </div>
+                </div>
+              </div>
+              <div class="row py-2">
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">아카코드</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" id="mig_a_code" name="mig_a_code" />
+                </div>
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">연동아이디</label>
+                <div class="col-md-4">
+                  <input type="text" class="form-control form-control-sm" id="mig_home_code" name="mig_home_code" />
+                </div>
+              </div>
+              <div class="row py-2">
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">사용여부</label>
+                <div class="col-md-4">
+                  <div class="form-check form-check-inline">
+                    <input type="radio" class="form-check-input" id="use_yn_y" name="use_yn" value="Y" />
+                    <label class="form-check-label" for="use_yn_y">사용</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input type="radio" class="form-check-input" id="use_yn_n" name="use_yn" value="N" />
+                    <label class="form-check-label" for="use_yn_n">미사용</label>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="card-footer">
+            <div class="row">
+              <div class="col-md-12 text-end">
+                <button class="btn btn-primary me-1 mb-1" id="btn_center_clear"><i class="fa fa-check"></i> <strong>신규</strong></button>
+                <button class="btn btn-info me-1 mb-1" id="btn_center_update"><i class="fa fa-paste"></i> <strong>저장</strong></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</html>

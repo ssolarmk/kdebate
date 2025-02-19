@@ -1,0 +1,561 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.web.kdebate.center.user.mapper.EmpMapper">
+
+	<select id="getQueryTotalCnt" resultType="int">
+		SELECT FOUND_ROWS()
+	</select>
+
+	<select id="acaIdChk" parameterType="hashMap" resultType="hashMap">
+		SELECT TA.ACA_ID as aca_id
+			 , NVL2(TA.P_ACA_ID, 'C', 'M') as aca_chk_yn
+		FROM TB_ACA TA
+		JOIN TB_USER TU ON TU.ACA_ID = TA.ACA_ID
+		WHERE TU.USER_ID = #{user_id}
+	</select>
+
+	<select id="getEmpListRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT SQL_CALC_FOUND_ROWS
+			   TE.EMP_ID as emp_user_id
+			 , TU.USER_NM as emp_user_nm
+			 , TU.TEL_NO as emp_tel_no
+			 , TU.HP_NO as emp_hp_no
+			 , TU.EMAIL as emp_email
+			 , TU.ADDR as emp_addr
+			 , TU.ADDR_DTL as emp_addr_dtl
+			 , TU.USE_YN as emp_use_yn
+			 , CASE TU.USE_YN WHEN 'Y' THEN '사용'
+							   WHEN 'N' THEN '미사용'
+							   ELSE NULL END        as emp_use_yn_nm
+			 , IFNULL((SELECT GROUP_CONCAT(AUTH_GRP_CD)
+			    FROM TB_USER_TP_AUTH_GRP
+			    WHERE USER_ID = TE.EMP_ID ),'') as emp_auth_grp_cd
+			 , IFNULL((SELECT GROUP_CONCAT(TC.CODE_NM)
+			    FROM TB_USER_TP_AUTH_GRP TUG
+			    JOIN TB_CODE TC ON TC.CODE = TUG.AUTH_GRP_CD
+			    WHERE TUG.USER_ID = TE.EMP_ID
+			    AND CODE != 'CODE' ), '') as emp_auth_grp_nm
+			 , TU.USER_GB_CD as emp_user_gb_cd
+			 , IFNULL((SELECT CODE_NM
+			    FROM TB_CODE
+			    WHERE CODE_GRP_CD = 'USER_GB_CD'
+			    AND CODE = TU.USER_GB_CD
+			    AND CODE != 'CODE' ),'') as emp_user_gb_nm
+			 , TE.EMP_TP as emp_tp
+			 , IFNULL((SELECT CODE_NM
+			    FROM TB_CODE
+			    WHERE CODE_GRP_CD = 'EMP_TP'
+			    AND CODE = TE.EMP_TP
+			    AND CODE != 'CODE' ),'') as emp_tp_nm
+			 , IFNULL((SELECT GROUP_CONCAT(JISA_CD)
+			    FROM TB_EMP_JISA
+			    WHERE EMP_ID = TE.EMP_ID ),'') as emp_dept
+			 , IFNULL((SELECT GROUP_CONCAT(WORK_CD)
+			    FROM TB_EMP_WORK
+			    WHERE EMP_ID = TE.EMP_ID ),'') as emp_work_cd
+			 , TE.WORK_LVL as emp_work_lvl
+			 , TE.JOIN_DT as emp_join_dt
+			 , TE.LEAV_DT as emp_leav_dt
+			 , TE.MEMO as emp_memo
+			 , TE.DID_URL AS emp_did_url
+			 , TE.DID_TEXT AS emp_did_text
+			 , TE.ENT_USER_ID as emp_ent_user_id
+			 , TE.SAL_BASE_AMT AS sal_base_amt
+			 , TE.SAL_SPC_AMT AS sal_spc_amt
+			 , TE.SAL_INSEN_BASE_CNT AS sal_insen_base_cnt
+			 , TE.SAL_INSEN_PER_AMT AS sal_insen_per_amt
+			 , TE.IMG_URL as img_url
+			 , TU.ACA_ID AS emp_aca_id
+			 , TE.ATD_CHK_CODE AS atd_chk_code
+			 , TE.LIVE_TEACH_YN AS live_teach_yn
+			 , TE.KIOSK_ATD_CHK_TP AS kiosk_atd_chk_tp
+		     , TE.KIOSK_ATD_ROOM_NO AS kiosk_atd_room_no
+		     , TE.KIOSK_ATD_GB AS kiosk_atd_gb
+		FROM TB_EMP TE
+		JOIN TB_USER TU ON TU.USER_ID = TE.EMP_ID
+		WHERE 1=1
+		<if test="srch_center != '' and srch_center != null">
+			AND TU.ACA_ID = #{srch_center}
+		</if>
+		<if test="srch_use_yn != '' and srch_use_yn != null">
+			AND TU.USE_YN = #{srch_use_yn}
+		</if>
+		<if test="srch_tp != ''">
+		 	<if test="srch_tp == 'name_tp'">
+		 		AND TU.USER_NM LIKE CONCAT('%', #{srch_tp_inp}, '%')
+		 	</if>
+		 	<if test="srch_tp == 'usid_tp'">
+		 		AND TU.USER_ID LIKE CONCAT('%', #{srch_tp_inp}, '%')
+		 	</if>
+		 </if>
+		<choose>
+			<when test="sidx != ''">
+				ORDER BY ${sidx} ${sord}
+			</when>
+			<otherwise>
+				ORDER BY TE.ENT_DTTM DESC
+			</otherwise>
+		</choose>
+		LIMIT ${start}, ${end}
+	</select>
+
+	<insert id="userCreate" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+		INSERT INTO TB_USER
+		(
+			USER_ID
+		  , ACA_ID
+		  , USER_NM
+		  , USER_PWD
+		  , USER_GB_CD
+		  , TEL_NO
+		  , HP_NO
+		  , EMAIL
+		  , ZIP_CODE
+		  , ADDR
+		  , ADDR_DTL
+		  , USE_YN
+		  , ENT_DTTM
+		  , ENT_USER_ID
+        )
+		VALUES
+		(
+			#{emp_user_id}
+		  , #{emp_aca_id}
+		  , #{emp_user_nm}
+		  , PASSWORD(#{emp_user_pwd})
+		  , #{emp_user_gb_cd}
+		  , #{emp_tel_no}
+		  , #{emp_hp_no}
+		  , #{emp_email}
+		  , #{emp_zip_code}
+		  , #{emp_addr}
+		  , #{emp_addr_dtl}
+		  , #{emp_use_yn}
+		  , NOW()
+		  , #{user_id}
+		 )
+	</insert>
+
+	<update id="userUpdate" parameterType="com.web.kdebate.center.user.domain.UserMngVO">
+	    UPDATE TB_USER
+	    	SET USER_NM = #{emp_user_nm}
+		 	  , TEL_NO = #{emp_tel_no}
+		 	  , HP_NO = #{emp_hp_no}
+		 	  , EMAIL = #{emp_email}
+		 	  , ZIP_CODE = #{emp_zip_code}
+		 	  , ADDR = #{emp_addr}
+		 	  , ADDR_DTL = #{emp_addr_dtl}
+		 	  <if test="emp_user_pwd != ''">
+		 	  , USER_PWD = PASSWORD(#{emp_user_pwd})
+		 	  </if>
+		 	  , USE_YN = #{emp_use_yn}
+		 	  , UPT_DTTM = NOW()
+		 	  , UPT_USER_ID = #{user_id}
+		 WHERE USER_ID = #{emp_user_id}
+	</update>
+
+	<insert id="userAuthGrpCreate" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+		INSERT INTO TB_USER_TP_AUTH_GRP
+		(
+			USER_ID
+          , AUTH_GRP_CD
+          , STR_DTTM
+          , END_DTTM
+          , UPT_DTTM
+          , UPT_USER_ID
+	    )
+		VALUES
+		(
+			#{emp_user_id}
+		  , #{emp_auth_grp_cd}
+		  , NOW()
+		  , DATE_ADD(NOW(), INTERVAL + 1 YEAR)
+		  , NOW()
+		  , #{user_id}
+		)
+		ON
+		 	DUPLICATE KEY
+		UPDATE
+			AUTH_GRP_CD = #{emp_auth_grp_cd}
+		  	, UPT_DTTM = NOW()
+		  	, UPT_USER_ID = #{user_id}
+	</insert>
+
+	<delete id="userAuthGrpDelete" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+		DELETE FROM TB_USER_TP_AUTH_GRP
+		WHERE USER_ID = #{emp_user_id}
+	</delete>
+
+	<insert id="empCreate" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+		INSERT INTO TB_EMP
+		(
+			EMP_ID
+		  , EMP_TP
+		  , WORK_LVL
+		  , JOIN_DT
+		  , LEAV_DT
+		  , MEMO
+		  , DID_URL
+		  , DID_TEXT
+		  <if test="sal_base_amt != '' and sal_base_amt != null">
+		  	, SAL_BASE_AMT
+		  </if>
+		  <if test="sal_spc_amt != '' and sal_spc_amt != null">
+		  	, SAL_SPC_AMT
+		  </if>
+		  <if test="sal_insen_base_cnt != '' and sal_insen_base_cnt != null">
+		  	, SAL_INSEN_BASE_CNT
+		  </if>
+		  <if test="sal_insen_per_amt != '' and sal_insen_per_amt != null">
+			, SAL_INSEN_PER_AMT
+		  </if>
+		  <if test="img_url !='' and img_url != null">
+		  	, IMG_URL
+		  </if>
+		  <if test="live_teach_yn !='' and live_teach_yn != null">
+		  	, LIVE_TEACH_YN
+		  </if>
+
+		  <if test="atd_chk_code !='' and atd_chk_code != null">
+		  	, ATD_CHK_CODE
+		  </if>
+		  <if test="emp_tp == '04'">
+		  , KIOSK_ATD_CHK_TP
+		  , KIOSK_ATD_ROOM_NO
+		  , KIOSK_ATD_GB
+		  </if>
+		  , ENT_DTTM
+		  , ENT_USER_ID
+        )
+		VALUES
+		(
+			#{emp_user_id}
+		  , #{emp_tp}
+		  , #{emp_work_lvl}
+		  , #{emp_join_dt}
+		  , #{emp_leav_dt}
+		  , #{emp_memo}
+		  , #{emp_did_url}
+		  , #{emp_did_text}
+		  <if test="sal_base_amt != '' and sal_base_amt != null">
+		  	, REPLACE(#{sal_base_amt}, ",", "")
+		  </if>
+		  <if test="sal_spc_amt != '' and sal_spc_amt != null">
+		  	, REPLACE(#{sal_spc_amt}, ",", "")
+		  </if>
+		  <if test="sal_insen_base_cnt != '' and sal_insen_base_cnt != null">
+		  	, #{sal_insen_base_cnt}
+		  </if>
+		  <if test="sal_insen_per_amt != '' and sal_insen_per_amt != null">
+			, REPLACE(#{sal_insen_per_amt}, ",", "")
+		  </if>
+		  <if test="img_url !='' and img_url != null">
+		  	, #{img_url}
+		  </if>
+		  <if test="live_teach_yn !='' and live_teach_yn != null">
+		  	, #{live_teach_yn}
+		  </if>
+		  <if test="atd_chk_code !='' and atd_chk_code != null">
+		  	, #{atd_chk_code}
+		  </if>
+		  <if test="emp_tp == '04'">
+		  , #{kiosk_atd_chk_tp}
+		  , #{kiosk_atd_room_no}
+		  , #{kiosk_atd_gb}
+		  </if>
+		  , NOW()
+		  , #{user_id}
+		)
+	</insert>
+
+	<update id="empUpdate" parameterType="com.web.kdebate.center.user.domain.UserMngVO">
+	    UPDATE TB_EMP
+	    	SET EMP_TP = #{emp_tp}
+			  , WORK_LVL = #{emp_work_lvl}
+			  , JOIN_DT = #{emp_join_dt}
+			  , LEAV_DT = #{emp_leav_dt}
+			  , MEMO = #{emp_memo}
+			  , DID_URL = #{emp_did_url}
+			  , DID_TEXT = #{emp_did_text}
+			  <if test="sal_base_amt != '' and sal_base_amt != null">
+			  	, SAL_BASE_AMT = REPLACE(#{sal_base_amt}, ",", "")
+			  </if>
+			  <if test="sal_spc_amt != '' and sal_spc_amt != null">
+			  	, SAL_SPC_AMT = REPLACE(#{sal_spc_amt}, ",", "")
+			  </if>
+			  <if test="sal_insen_base_cnt != '' and sal_insen_base_cnt != null">
+			  	, SAL_INSEN_BASE_CNT = #{sal_insen_base_cnt}
+			  </if>
+			  <if test="sal_insen_per_amt != '' and sal_insen_per_amt != null">
+				, SAL_INSEN_PER_AMT = REPLACE(#{sal_insen_per_amt}, ",", "")
+			  </if>
+			  <if test="img_url != '' and img_url != null">
+			   	, IMG_URL = #{img_url}
+			  </if>
+			  <if test="live_teach_yn !='' and live_teach_yn != null">
+		  		,LIVE_TEACH_YN = #{live_teach_yn}
+		  	  </if>
+			  <if test="atd_chk_code !='' and atd_chk_code != null">
+		  		, ATD_CHK_CODE = #{atd_chk_code}
+		  	  </if>
+		  	  <if test="emp_tp == '04'">
+			  , KIOSK_ATD_CHK_TP = #{kiosk_atd_chk_tp}
+			  , KIOSK_ATD_ROOM_NO = #{kiosk_atd_room_no}
+			  , KIOSK_ATD_GB = #{kiosk_atd_gb}
+			  </if>
+			  , UPT_DTTM = NOW()
+			  , UPT_USER_ID = #{user_id}
+		WHERE EMP_ID = #{emp_user_id}
+	</update>
+	
+	<insert id="subUserCreate" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+	/* EmpMapper.subUserCreate */
+		INSERT INTO TB_USER
+		(
+			USER_ID
+		  , ACA_ID
+		  , USER_NM
+		  , USER_PWD
+		  , USER_GB_CD		  
+		  , USE_YN
+		  , ENT_DTTM
+		  , ENT_USER_ID
+        )
+		VALUES
+		(
+			#{emp_sub_user_id}
+		  , #{emp_aca_id}
+		  , #{emp_sub_user_nm}
+		  , PASSWORD(#{emp_user_pwd})
+		  , #{emp_sub_user_gb_cd}		  
+		  , #{emp_sub_use_yn}
+		  , NOW()
+		  , #{user_id}
+		 )
+	</insert>
+	
+	<insert id="subEmpCreate" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+	/* EmpMapper.subEmpCreate */
+		INSERT INTO TB_EMP
+		(
+			EMP_ID
+		  , MGT_EMP_ID
+		  , EMP_TP	
+		  , LIVE_TEACH_YN	  
+		  , JOIN_DT		  
+		  , MEMO		  
+		  , ENT_DTTM
+		  , ENT_USER_ID
+        )
+		VALUES
+		(
+			#{emp_sub_user_id}
+		  , #{emp_user_id}	
+		  , #{emp_sub_tp}
+		  , #{live_teach_yn}		  
+		  , NOW()		  
+		  , #{emp_sub_memo}		  
+		  , NOW()
+		  , #{user_id}
+		)
+	</insert>
+	
+	<insert id="subAuthGrpCreate" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+	/* EmpMapper.subAuthGrpCreate */
+		INSERT INTO TB_USER_TP_AUTH_GRP
+		(
+			USER_ID
+          , AUTH_GRP_CD
+          , STR_DTTM
+          , END_DTTM
+          , UPT_DTTM
+          , UPT_USER_ID
+	    )
+		VALUES
+		(
+			#{emp_sub_user_id}
+		  , #{emp_sub_auth_grp_cd}
+		  , NOW()
+		  , DATE_ADD(NOW(), INTERVAL + 1 YEAR)
+		  , NOW()
+		  , #{user_id}
+		)
+		ON
+		 	DUPLICATE KEY
+		UPDATE
+			AUTH_GRP_CD = #{emp_sub_auth_grp_cd}
+		  	, UPT_DTTM = NOW()
+		  	, UPT_USER_ID = #{user_id}
+	</insert>
+	
+	<insert id="subEmpWorkCdCreate" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+	/* EmpMapper.subEmpWorkCdCreate */
+		INSERT INTO TB_EMP_WORK
+		(
+			EMP_ID
+          , WORK_CD
+          , ENT_DTTM
+          , ENT_USER_ID
+	    )
+		VALUES
+		(
+			#{emp_sub_user_id}
+		  , #{emp_sub_work_cd}
+		  , NOW()
+		  , #{user_id}
+		)
+		ON
+		 	DUPLICATE KEY
+		UPDATE
+			WORK_CD = #{emp_sub_work_cd}
+	</insert>
+
+	<insert id="empJisaGrpCreate" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+		INSERT INTO TB_EMP_JISA
+		(
+			EMP_ID
+          , JISA_CD
+          , ENT_DTTM
+          , ENT_USER_ID
+	    )
+		VALUES
+		(
+			#{emp_user_id}
+		  , #{emp_dept}
+		  , NOW()
+		  , #{user_id}
+		)
+		ON
+		 	DUPLICATE KEY
+		UPDATE
+			JISA_CD = #{emp_dept}
+	</insert>
+
+	<delete id="empJisaGrpDelete" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+		DELETE FROM TB_EMP_JISA
+		WHERE EMP_ID = #{emp_user_id}
+	</delete>
+
+	<insert id="empWorkCdCreate" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+		INSERT INTO TB_EMP_WORK
+		(
+			EMP_ID
+          , WORK_CD
+          , ENT_DTTM
+          , ENT_USER_ID
+	    )
+		VALUES
+		(
+			#{emp_user_id}
+		  , #{emp_work_cd}
+		  , NOW()
+		  , #{user_id}
+		)
+		ON
+		 	DUPLICATE KEY
+		UPDATE
+			WORK_CD = #{emp_work_cd}
+	</insert>
+
+	<delete id="empWorkCdDelete" parameterType="com.web.kdebate.center.user.domain.EmpMngVO">
+		DELETE FROM TB_EMP_WORK
+		WHERE EMP_ID = #{emp_user_id}
+	</delete>
+
+	<insert id="cnctInfoCreate" parameterType="hashMap">
+		/* EmpMapper.cnctInfoCreate */
+		INSERT
+		  INTO TB_USER_CNCT_LOG
+  			   (  USER_ID
+	            , IP
+	            , MAC_ADDR
+	            , CNCT_SCS_YN
+	            , ENT_DTTM)
+		 SELECT USER_ID
+		 	  , IP
+		 	  , MAC_ADDR
+		 	  , 'Y'
+		 	  , NOW()
+		   FROM TB_USER_CNCT_LOG
+		  WHERE CNCT_LOG_SQ = #{cnct_log_sq}
+	</insert>
+
+	<insert id="loginChkInfoCreate" parameterType="hashMap">
+		/* EmpMapper.loginChkInfoCreate */
+		INSERT
+		  INTO TB_USER_LOGIN_CHK
+  			   (  USER_ID
+	            , IP_ADDR
+	            , MAC_ADDR
+	            , USE_YN
+	            , ENT_DTTM
+	            , ENT_USER_ID)
+		 SELECT USER_ID
+		 	  , IP
+		 	  , MAC_ADDR
+		 	  , 'Y'
+		 	  , NOW()
+		 	  , #{ent_user_id}
+		   FROM TB_USER_CNCT_LOG
+		  WHERE CNCT_LOG_SQ = #{cnct_log_sq}
+	</insert>
+
+	<select id="getEmpCnctLogRetrieve" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		/* EmpMapper.getEmpCnctLogRetrieve */
+	 SELECT SQL_CALC_FOUND_ROWS
+	        D.*
+	   FROM ((SELECT A.CNCT_LOG_SQ AS "cnct_log_sq"
+				   , A.IP AS "cnct_log_ip"
+				   , A.MAC_ADDR AS "cnct_mac_addr"
+				   , A.CNCT_SCS_YN AS "cnct_scs_yn"
+				   , CASE WHEN A.CNCT_SCS_YN = 'Y' THEN '성공'
+				 		  ELSE '실패'
+				 		  END AS "cnct_scs_yn_nm"
+				   , DATE_FORMAT(A.ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS 'ent_dttm'
+				   , A.USER_ID AS "user_id"
+			       , '' AS CHK_YN
+			   FROM TB_USER_CNCT_LOG A
+			  WHERE 1=1
+			   <if test="usid !=''">
+			    AND A.USER_ID = #{user_id}
+			   </if>
+			    AND A.CNCT_SCS_YN = 'Y')
+		  UNION ALL
+		  	(SELECT C.*
+		       FROM (SELECT A.CNCT_LOG_SQ AS "cnct_log_sq"
+						  , A.IP AS "cnct_log_ip"
+						  , A.MAC_ADDR AS "cnct_mac_addr"
+						  , A.CNCT_SCS_YN AS "cnct_scs_yn"
+						  , CASE WHEN A.CNCT_SCS_YN = 'Y' THEN '성공'
+						  		 ELSE '실패'
+						 		 END AS "cnct_scs_yn_nm"
+						  , DATE_FORMAT(A.ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS 'ent_dttm'
+						  , A.USER_ID AS "user_id"
+			       		  , (SELECT COUNT(*)
+			       		  	   FROM TB_USER_LOGIN_CHK B
+			       		  	  WHERE B.USER_ID = A.USER_ID
+			       		  	    AND IFNULL(B.MAC_ADDR,'') = IFNULL(A.MAC_ADDR,'')
+			       		  	    AND IFNULL(B.IP_ADDR,'') = IFNULL(A.IP,'')) AS CHK_YN
+					  FROM TB_USER_CNCT_LOG A
+		     		 WHERE 1=1
+		     		  <if test="usid !=''">
+					   AND A.USER_ID = #{user_id}
+					  </if>
+		       		   AND A.CNCT_SCS_YN = 'N') C
+		  	  WHERE C.CHK_YN = 0)) D
+		 ORDER BY D.ent_dttm DESC
+		 LIMIT ${start}, ${end}
+	</select>
+
+	<select id="getAtdChkCodeRetrieve" parameterType="HashMap" resultType="int">
+		SELECT
+			COUNT(1)
+		FROM TB_EMP TE
+			LEFT JOIN TB_USER TU
+				ON TU.USER_ID = TE.EMP_ID
+		WHERE 1=1
+		AND TU.ACA_ID=#{ACA_ID}
+		AND TE.ATD_CHK_CODE=#{ATD_CHK_CODE}
+	</select>
+
+</mapper>

@@ -1,0 +1,83 @@
+<head th:fragment="config">
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- ===============================================-->
+  <!--    Document Title-->
+  <!-- ===============================================-->
+  <!-- ===============================================-->
+  <!--    Favicons-->
+  <!-- ===============================================-->
+  <link href="https://fonts.googleapis.com/css?family=Nanum+Gothic:400" rel="stylesheet" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/img/favicons/apple-touch-icon.png" />
+  <link rel="shortcut icon" type="image/x-icon" href="/img/favicons/favicon.ico" />
+  <link rel="manifest" href="/img/favicons/manifest.json" />
+  <meta name="msapplication-TileImage" content="/img/favicons/mstile-150x150.png" />
+  <meta name="theme-color" content="#ffffff" />
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/js/config.js"></script>
+  <script src="/vendors/jquery/jquery.min.js"></script>
+  <script src="/vendors/select2/select2.min.js"></script>
+  <script src="/vendors/select2/select2.full.min.js"></script>
+  <script src="/js/commonUtil.js"></script>
+  <script src="/js/ajaxCommon.js"></script>
+
+  <script src="/vendors/simplebar/simplebar.min.js"></script>
+
+  <!-- ===============================================-->
+  <!--    Stylesheets-->
+  <!-- ===============================================-->
+  <link rel="preconnect" href="https://fonts.gstatic.com" />
+  <link href="/vendors/swiper/swiper-bundle.min.css" rel="stylesheet" />
+  <link href="/vendors/glightbox/glightbox.min.css" rel="stylesheet" />
+  <link href="/vendors/plyr/plyr.css" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" />
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,500,600,700%7cPoppins:300,400,500,600,700,800,900&amp;display=swap" rel="stylesheet" />
+  <link href="/vendors/simplebar/simplebar.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/vendors/datatables.net-bs5/dataTables.bootstrap5.min.css" />
+  <link rel="stylesheet" href="/vendors/select2/select2.min.css" />
+  <link rel="stylesheet" href="/vendors/select2-bootstrap-5-theme/select2-bootstrap-5-theme.min.css" />
+  <link href="/vendors/dropzone/dropzone.css" rel="stylesheet" />
+  <link href="/vendors/flatpickr/flatpickr.min.css" rel="stylesheet" />
+  <link href="/css/theme-rtl.css" rel="stylesheet" id="style-rtl" />
+  <link href="/css/theme.css" rel="stylesheet" id="style-default" />
+  <link href="/css/user-rtl.css" rel="stylesheet" id="user-style-rtl" />
+  <link href="/css/user.css" rel="stylesheet" id="user-style-default" />
+  <style>
+    .content {
+      min-height: calc(100vh - var(--falcon-top-nav-height));
+    }
+    .content {
+      padding-bottom: 0 !important;
+    }
+  </style>
+  <script>
+    var isRTL = JSON.parse(localStorage.getItem("isRTL"));
+    if (isRTL) {
+      var linkDefault = document.getElementById("style-default");
+      var userLinkDefault = document.getElementById("user-style-default");
+      linkDefault.setAttribute("disabled", true);
+      userLinkDefault.setAttribute("disabled", true);
+      document.querySelector("html").setAttribute("dir", "rtl");
+    } else {
+      var linkRTL = document.getElementById("style-rtl");
+      var userLinkRTL = document.getElementById("user-style-rtl");
+      linkRTL.setAttribute("disabled", true);
+      userLinkRTL.setAttribute("disabled", true);
+    }
+  </script>
+  <!-- ===============================================-->
+  <!--    JavaScripts-->
+  <!-- ===============================================-->
+  <script src="/vendors/popper/popper.min.js"></script>
+  <script src="/vendors/bootstrap/bootstrap.min.js"></script>
+  <script src="/vendors/anchorjs/anchor.min.js"></script>
+  <script src="/vendors/is/is.min.js"></script>
+  <script src="/vendors/flatpickr/flatpickr.min.js"></script>
+  <script src="/vendors/fontawesome/all.min.js"></script>
+  <script src="/vendors/lodash/lodash.min.js"></script>
+  <script src="/vendors/list.js/list.min.js"></script>
+  <script src="/vendors/moment/moment.min.js"></script>
+  <script src="/vendors/moment/moment-with-locales.min.js"></script>
+  <script src="/js/theme.js"></script>
+</head>

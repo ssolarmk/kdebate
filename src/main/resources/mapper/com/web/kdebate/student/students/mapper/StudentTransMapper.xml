@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.web.kdebate.student.students.mapper.StudentTransMapper">
+    <select id="getAcaRequestInfo" resultType="com.web.kdebate.student.students.domain.AcaStdRequestVo" >
+        SELECT '1.0.0' AS ver
+        , MIG_A_CODE AS custCode
+        , MIG_HOME_CODE AS id
+        , 'debate!@34' AS pw
+        , 'STUDENT_INFO'  AS cmd
+        FROM TB_ACA
+        WHERE MIG_A_CODE IS NOT NULL
+    </select>
+    <update id="UpdateAcaStdData" parameterType="hashMap">
+        INSERT INTO classin_kdebate.TB_ACA_ACA2000 (
+            sId
+            , name
+            , hp
+            , birthDay
+            , pName
+            , pHp
+            , scName
+            , scYear
+            , cardNum
+            , addr
+            , addrDetail
+            , stdStatus
+            , regDate
+            , endDate
+            , custCode
+            , acaId
+            )
+            VALUES
+            (
+                #{sId}
+                , #{name}
+                , #{hp}
+                , #{birthDay}
+                , #{pName}
+                , #{pHp}
+                , #{scName}
+                , #{scYear}
+                , #{cardNum}
+                , #{addr}
+                , #{addrDetail}
+                , #{stdStatus}
+                , #{regDate}
+                , #{endDate}
+                , #{custCode}
+                , (SELECT ACA_ID FROM TB_ACA WHERE MIG_A_CODE = #{custCode})
+            )
+            ON DUPLICATE KEY UPDATE
+              name = #{name}
+            , hp = #{hp}
+            , birthDay = #{birthDay}
+            , pName = #{pName}
+            , pHp = #{pHp}
+            , scName = #{scName}
+            , scYear = #{scYear}
+            , cardNum = #{cardNum}
+            , addr = #{addr}
+            , addrDetail = #{addrDetail}
+            , stdStatus = #{stdStatus}
+            , regDate = #{regDate}
+            , endDate = #{endDate}
+            , custCode = #{custCode}
+            , acaId = (SELECT ACA_ID FROM TB_ACA WHERE MIG_A_CODE = #{custCode})
+
+    </update>
+    <select id="getAcaStdData" resultType="com.web.kdebate.student.students.domain.AcaStdDataVo" >
+        SELECT
+            sId
+            , name
+            , hp
+            , birthDay
+            , pName
+            , pHp
+            , scName
+            , scYear
+            , cardNum
+            , addr
+            , addrDetail
+            , stdStatus
+            , regDate
+            , endDate
+            , custCode
+            , acaId
+        FROM TB_ACA_ACA2000
+        WHERE cardNum NOT IN (
+            SELECT STD_ID FROM TB_STD_INFO
+        )
+        AND cardNum IS NOT NULL
+        AND cardNum != ''
+        </select>
+</mapper>

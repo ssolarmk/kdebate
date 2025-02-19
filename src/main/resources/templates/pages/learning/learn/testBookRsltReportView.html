@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko-KR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="robots" content="noindex,follow" />
+    <title>독서진단 결과</title>
+
+    <link rel="stylesheet" href="/vendors/report/reportCustom.css" />
+    <link rel="stylesheet" href="/vendors/report/Chart.min.css" />
+    <link rel="stylesheet" type="text/css" media="screen" href="/vendors/report/sweetalert.css" />
+
+    <!-- Link to Google CDN's jQuery + jQueryUI; fall back to local -->
+    <script src="/vendors/report/jquery-3.2.1.min.js"></script>
+    <script src="/vendors/report/jquery-ui.min.js"></script>
+
+    <script src="/vendors/report/sweetalert/sweetalert.min.js"></script>
+    <script src="/vendors/report/ajaxCommon.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+    <style>
+      html,
+      body {
+        padding: 0;
+        margin: 0;
+      }
+
+      .print_wrap {
+        position: relative;
+        font-size: 14px;
+        padding: 10px;
+      }
+      .print_wrap * {
+        box-sizing: border-box;
+      }
+      .print_wrap .page_section {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .print_wrap .page_section .p_group {
+        padding: 0 0 30px 0;
+      }
+      .print_wrap .page_section .p_group_inner {
+        width: 100%;
+        margin: 0 auto;
+      }
+      .print_wrap .p_logo {
+        display: none;
+        font-size: 0.875em;
+        text-align: left;
+        font-weight: bold;
+      }
+      .print_wrap .p_select {
+        position: absolute;
+        bottom: 20px;
+        right: 0;
+        display: inline-block;
+      }
+      .print_wrap .p_select b {
+        font-size: 14px;
+        font-weight: 400;
+      }
+      .print_wrap .p_select select {
+        height: 30px;
+        border-radius: 0;
+      }
+
+      .print_wrap .p_tit01 {
+        position: relative;
+        font-size: 1.875em;
+        text-align: center;
+        padding: 50px 0 20px 0;
+        font-weight: bold;
+      }
+      .print_wrap .p_tit02 {
+        position: relative;
+        font-size: 1.125em;
+        font-weight: bold;
+      }
+      .print_wrap .p_desc {
+        font-size: 1em;
+        padding: 15px;
+        text-align: center;
+        font-weight: bold;
+        background-color: #f2f2f2;
+        border-radius: 10px;
+      }
+      .print_wrap .p_desc b {
+        color: #1e99f7;
+      }
+      .print_wrap .p_right {
+        text-align: right;
+      }
+      .print_wrap .p_center {
+        text-align: center;
+      }
+      .print_wrap .p_point {
+        color: #f7701e;
+      }
+
+      .print_wrap .p_cell_wrap {
+        display: table;
+        width: 100%;
+        table-layout: fixed;
+      }
+      .print_wrap .p_cell_wrap .cell_item {
+        display: table-cell;
+        width: auto;
+        vertical-align: middle;
+      }
+      .print_wrap .p_cell_wrap .cell_item:first-child {
+        width: 50%;
+        padding: 0 20px 0 0;
+      }
+      .print_wrap .p_cell_wrap.full_type .cell_item {
+        width: 100%;
+      }
+      .print_wrap .p_cell_wrap.full_type .cell_item:first-child.graph_type {
+        padding: 20px;
+      }
+      .print_wrap .graph_type {
+        text-align: center;
+        padding: 20px;
+        border: 1px solid #666;
+      }
+      .print_wrap .p_cont {
+        min-height: 200px;
+        padding: 15px;
+        line-height: 1.5;
+        border: 1px solid #666;
+      }
+
+      table.p_table {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        border-collapse: collapse;
+      }
+      table.p_table th,
+      table.p_table td {
+        padding: 10px 10px;
+        border: 1px solid #666;
+      }
+      table.p_table th {
+        text-align: center;
+        background-color: #f0c58d;
+      }
+      table.p_table b {
+        font-weight: bold;
+      }
+      table.p_table.type2 th {
+        background-color: #bbdff3;
+        font-weight: 400;
+      }
+      table.p_table.type3 th {
+        background-color: #bbdff3;
+        font-weight: 400;
+      }
+      table.p_table.type3 th,
+      table.p_table.type3 td {
+        font-size: 0.875em;
+        text-align: center;
+        padding: 2px 5px;
+      }
+      table.p_table .p_brd_top th,
+      table.p_table .p_brd_top td {
+        border-width: 2px 1px 1px 1px;
+      }
+      table.p_table tr.p_bg_yellow td {
+        background-color: #fff8d8;
+      }
+
+      .page_header {
+        height: 300px;
+        margin: -10px;
+        background-image: url(./vendors/report/sub_visual_bg02.png);
+        background-size: cover;
+        background-position: center;
+      }
+
+      .page_footer {
+        text-align: center;
+        margin: 50px -10px -10px -10px;
+        padding: 5px 10px 2px 10px;
+        background-color: #d5d2cd;
+      }
+      .page_footer img {
+        width: 180px;
+      }
+
+      .page_inner {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        text-align: center;
+        color: #333;
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      .page_inner p {
+        margin: 0;
+      }
+      .page_inner p ~ p {
+        margin-top: 10px;
+      }
+
+      .p_btn_wrap {
+        max-width: 1200px;
+        text-align: right;
+        margin: 0 auto;
+        padding: 40px 0 0 0;
+      }
+      .p_btn_wrap button {
+        font-size: 0.9375em;
+        color: #fff;
+        margin: 0;
+        padding: 5px 18px;
+        font-weight: normal;
+        line-height: 1.5;
+        text-align: center;
+        border: none;
+        border-radius: 4px;
+        background-color: #0087d4;
+        letter-spacing: normal;
+        cursor: pointer;
+        vertical-align: middle;
+        text-shadow: none;
+        box-shadow: none;
+      }
+      .p_btn_wrap button:hover {
+        opacity: 0.9;
+      }
+
+      @media (max-width: 767px) {
+        table.p_table.responsive_tb {
+          border-top: 1px solid #666;
+        }
+        table.p_table.responsive_tb colgroup {
+          display: none;
+        }
+        table.p_table.responsive_tb th,
+        table.p_table.responsive_tb td {
+          display: block;
+          text-align: center;
+          border-top: none;
+        }
+
+        .p_btn_wrap {
+          display: none;
+        }
+
+        .print_wrap .p_cell_wrap .cell_item {
+          display: block;
+        }
+        .print_wrap .p_cell_wrap .cell_item:first-child {
+          width: 100%;
+          padding: 0 0 20px 0;
+        }
+        .print_wrap .p_select {
+          position: relative;
+          display: block;
+          bottom: 0;
+        }
+
+        .page_header {
+          height: 220px;
+          background-position: left center;
+        }
+        .page_inner img {
+          max-width: 80%;
+        }
+      }
+
+      @media print {
+        .page_header,
+        .page_footer,
+        .p_btn_wrap {
+          display: none;
+        }
+        .print_wrap .p_logo {
+          display: block;
+        }
+        .print_wrap {
+          width: 95%;
+          margin: auto;
+        }
+        .print_wrap .p_cell_wrap .cell_item {
+          display: table-cell;
+          width: auto;
+          vertical-align: middle;
+        }
+        .print_wrap .p_cell_wrap .cell_item:first-child {
+          width: 50%;
+          padding: 0 20px 0 0;
+        }
+        .print_wrap .p_select {
+          position: absolute;
+          display: inline-block;
+        }
+
+        table.p_table.responsive_tb {
+          border-top: none;
+        }
+        table.p_table.responsive_tb colgroup {
+          display: table-column-group;
+        }
+        table.p_table.responsive_tb th,
+        table.p_table.responsive_tb td {
+          display: table-cell;
+          border-top: 1px solid #666;
+        }
+        table.p_table.responsive_tb th {
+          text-align: center;
+        }
+        table.p_table.responsive_tb td {
+          text-align: left;
+        }
+
+        .apexcharts-canvas,
+        .apexcharts-svg.apexcharts-zoomable {
+          overflow: visible !important;
+          height: auto !important;
+          width: auto !important;
+        }
+
+        /* 
+		.print_wrap .p_tit01 {padding:0;}
+		.print_wrap .p_cell_wrap .cell_item {display:table-cell;width:auto;vertical-align:middle;}
+		.print_wrap .p_cell_wrap .cell_item:first-child {width:50%;padding:0 20px 0 0;}
+		.print_wrap .page_section .p_group_inner {width:75%;}
+		
+		*/
+      }
+    </style>
+
+    <script>
+      $(() => {
+        let quesInfo = JSON.parse('[(${questionInfo})]');
+        let chartInfo = JSON.parse('[(${chartInfo})]');
+
+        setChart(chartInfo); // 성적 추이 차트
+        setTableFnc(quesInfo); // 문항별 진단표
+
+        let isSession = window.location.pathname;
+        if (isSession.includes('common')) {
+          $('#reportSms').hide();
+        } else {
+          $('#reportSms').show();
+        }
+      });
+
+      function setChart(datas) {
+        let html = `
+		<div class="chartDiv">
+			<div id='chart'></div>
+		</div>`;
+
+        $('.chartDiv').remove();
+        $('.cell_item.graph_type').append(html);
+
+        let personal_rslt = datas.map((data) => data.score).reverse();
+        let apply_dt = datas.map((data) => data.end_dtm).reverse();
+
+        if (apply_dt.length < 10) {
+          apply_dt = apply_dt.concat(Array(10 - apply_dt.length).fill('-'));
+        }
+
+        let options = {
+          series: [
+            {
+              name: '평가 내용',
+              data: personal_rslt,
+            },
+          ],
+          chart: {
+            type: 'area',
+            toolbar: { show: false },
+            height: 330,
+          },
+          xaxis: {
+            type: 'sales',
+            categories: apply_dt,
+            labels: {
+              show: true,
+              style: {
+                fontSize: '11px',
+                fontWeight: 700,
+              },
+            },
+          },
+          fill: {
+            type: 'gradient',
+            gradient: {
+              shadeIntensity: 1,
+              inverseColors: false,
+              opacityFrom: 0.5,
+              opacityTo: 0,
+              stops: [0, 90, 100],
+            },
+          },
+          yaxis: {
+            type: 'numeric',
+            min: 0,
+            max: 100,
+            labels: {
+              show: true,
+              formatter: function (val) {
+                return val.toFixed(0);
+              },
+              style: {
+                fontWeight: 100,
+              },
+            },
+          },
+          markers: {
+            size: 5,
+          },
+        };
+
+        let chart = new ApexCharts(document.querySelector('#chart'), options);
+        chart.render();
+      }
+
+      function setTableFnc(datas) {
+        let str = '';
+
+        for (let i = 0; i < datas.length; i++) {
+          str += '<tr>';
+          str += '<th>' + (i + 1) + '</th>';
+          str += '<td>' + datas[i].ex1 + '</td>';
+          str += '<td>' + datas[i].ex2 + '</td>';
+          str += '<td>' + datas[i].ex3 + '</td>';
+          str += '<td>' + datas[i].ex4 + '</td>';
+          str += '<td>' + datas[i].correct + '</td>';
+        }
+
+        $('#resultTable').children().remove();
+        $('#resultTable').append(str);
+      }
+
+      /* 인쇄 */
+      const fn_export = () => {
+        var initBody = document.body.innerHTML;
+        window.onbeforeprint = $('.print_wrap').html();
+        window.onafterprint = initBody;
+
+        window.print();
+
+        return false;
+      };
+
+      /* sms 전송 */
+      const fn_sms = () => {
+        const reqUrl = '/learning/learn/testBookRsltMng/reportSmsCreate';
+
+        let json = {
+          std_id: '[[${examInfo.lms_std_id}]]',
+          rpt_id: '[[${examInfo.rpt_id}]]',
+          unique_code: '[[${examInfo.unique_code}]]',
+        };
+
+        ConfirmdialogToAjax('전송 하시겠습니까?', reqUrl, json, (data) => {
+          if (data.resultCode === 'S000') {
+            swal('성공', data.resultMsg, 'success');
+            setTimeout(function () {
+              location.reload();
+            }, 1000);
+          } else {
+            swal('오류', '작업수행에 실패하였습니다.', 'error');
+          }
+        });
+      };
+    </script>
+  </head>
+  <body>
+    <div class="print_wrap">
+      <div class="page_header" style="background-image: url('/vendors/report/sub_visual_bg02.png')">
+        <div class="page_inner">
+          <div>
+            <p><img src="/img/logos/logo.png" alt="logo" /></p>
+            <p>BEST보다 ‘UNIQUE’를 지향하는<br />공부의 종합예술 '디베이트 전문 학원'입니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p_btn_wrap">
+        <button type="button" class="" title="인쇄" onclick="fn_export();">인쇄</button>
+        <!--<button type="button" class="" title="인쇄" onclick="fn_sms();" style="display: none" id="reportSms">SMS 전송</button>-->
+      </div>
+
+      <!-- page -->
+      <div class="page_section">
+        <!-- <div class="p_logo">[ K디베이트 코칭센터 ]</div> -->
+
+        <div class="p_group">
+          <h1 class="p_tit01">독서진단 결과</h1>
+
+          <table class="p_table type2 responsive_tb">
+            <colgroup>
+              <col width="14%" />
+              <col width="auto" />
+              <col width="14%" />
+              <col width="14%" />
+              <col width="14%" />
+              <col width="15%" />
+            </colgroup>
+            <tr>
+              <th>도서명</th>
+              <td colspan="3"><b th:text="${examInfo.title}"></b></td>
+              <th>독서이해도</th>
+              <td th:text="${examInfo.corrate_rate}"></td>
+            </tr>
+            <tr>
+              <th>학교/학년</th>
+              <td th:text="${examInfo.sch_nm}"></td>
+              <th>이름</th>
+              <td th:text="${examInfo.user_nm}"></td>
+              <th>진단일자</th>
+              <td th:text="${examInfo.end_dtm}"></td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="p_group">
+          <div class="p_group_inner">
+            <h1 class="p_tit02">◎ 문항별 진단표</h1>
+
+            <table class="p_table type3">
+              <colgroup>
+                <col width="12%" />
+                <col width="17.5%" />
+                <col width="17.5%" />
+                <col width="17.5%" />
+                <col width="17.5%" />
+                <col width="auto" />
+              </colgroup>
+              <tr class="p_brd_top">
+                <th rowspan="2">문항</th>
+                <th colspan="4">평가영역</th>
+                <th rowspan="2">정답확인</th>
+              </tr>
+              <tr>
+                <th>어휘</th>
+                <th>사실</th>
+                <th>추론</th>
+                <th>비판</th>
+              </tr>
+
+              <tbody id="resultTable"></tbody>
+
+              <tr class="p_bg_yellow">
+                <td>정답/<br />전체</td>
+                <td>[[${statisticsInfo.ex1_c}]]/[[${statisticsInfo.ex1_t}]]<br />([[${statisticsInfo.ex1_rate}]])</td>
+                <td>[[${statisticsInfo.ex2_c}]]/[[${statisticsInfo.ex2_t}]]<br />([[${statisticsInfo.ex2_rate}]])</td>
+                <td>[[${statisticsInfo.ex3_c}]]/[[${statisticsInfo.ex3_t}]]<br />([[${statisticsInfo.ex3_rate}]])</td>
+                <td>[[${statisticsInfo.ex4_c}]]/[[${statisticsInfo.ex4_t}]]<br />([[${statisticsInfo.ex4_rate}]])</td>
+                <td>[[${statisticsInfo.tot_c}]]/[[${statisticsInfo.tot_t}]]<br />([[${statisticsInfo.tot_rate}]])</td>
+              </tr>
+              <tr class="p_bg_yellow">
+                <td colspan="5">총 점수</td>
+                <td><span class="p_point" th:text="${examInfo.score}"></span> 점</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+        <div class="p_group">
+          <div class="p_group_inner">
+            <h1 class="p_tit02">◎ 최근 10회 평가 성적 추이</h1>
+
+            <div class="p_cell_wrap full_type">
+              <div class="cell_item graph_type"></div>
+            </div>
+          </div>
+          <p class="p_desc">
+            [[${examInfo.user_nm}]] 학생의 진단 결과 독서 이해도는 [[${examInfo.corrate_rate}]]입니다.<br />
+            <b>꼼꼼히 잘 읽었네요.</b> 수고하셨습니다.
+          </p>
+        </div>
+      </div>
+      <!-- //page -->
+
+      <div class="page_footer">
+        <p><img src="/img/logos/logo.png" alt="logo" /></p>
+      </div>
+    </div>
+  </body>
+</html>

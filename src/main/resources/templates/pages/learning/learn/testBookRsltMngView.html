@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/default}" layout:fragment="Content">
+  <head>
+    <title>독서레벨 평과관리</title>
+    <script src="/vendors/tinymce/tinymce.min.js"></script>
+    <script src="/vendors/datatables.net/dataTables.min.js"></script>
+    <script src="/vendors/datatables.net-bs5/dataTables.bootstrap5.min.js"></script>
+    <script src="/vendors/datatables.net-fixedcolumns/dataTables.fixedColumns.min.js"></script>
+    <script src="/vendors/dropzone/dropzone-min.js"></script>
+    <script src="/js/jquery.form.js"></script>
+    <link rel="stylesheet" href="/vendors/datatables.net-bs5/dataTables.bootstrap5.min.css" />
+    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+    <script src="/vendors/chart/chart.umd.js"></script>
+  </head>
+  <script>
+    var sch_lvl_arr = [];
+
+    const fn_str_date_set = () => {
+      $('#srch_str_date').val(moment().subtract(3, 'month').format('YYYY-MM-DD'));
+      $('#srch_end_date').val(moment().add(10, 'day').format('YYYY-MM-DD'));
+    };
+    $(function () {
+      fn_str_date_set();
+      fn_chart_set();
+
+      fn_getCenter();
+      $('#frm_std_srch').onLoadFunction();
+      $('#frm_exam_info').onLoadFunction();
+      $('#frm_modal_exam_info').onLoadFunction();
+      $('#srch_str_date').change(function () {
+        var endTm = $('#srch_end_date').val();
+        var srtTm = $('#srch_str_date').val();
+        if (!!endTm) {
+          if (srtTm > endTm) {
+            swal('경고', '시작 날짜는 종료 날짜보다 클 수 없습니다', 'error');
+            fn_str_date_set();
+          }
+        }
+      });
+
+      $('#srch_end_date').change(function () {
+        var endTm = $('#srch_end_date').val();
+        var srtTm = $('#srch_str_date').val();
+        if (!!srtTm) {
+          if (endTm < srtTm) {
+            swal('경고', '종료 날짜는 시작 날짜보다 작을 수 없습니다', 'error');
+            fn_str_date_set();
+          }
+        }
+      });
+      $('#srch_center').change((e) => {
+        if (e.target.value === '') {
+          fn_srch_grid_reset();
+          return;
+        }
+
+        $('#live_chk').trigger('change');
+      });
+      /* 독서레벨 조회 */
+      fn_get_reading_lvl();
+
+      $('#std_p_lvl_cd').change((e) => fn_get_2_dep_lvl());
+      $('#std_lvl_cd').change((e) => fn_sub_list_srch(e.target.value));
+
+      //공통코드 조회
+      callAjax('/common/common/totalCodelist', "CODE_GRP_CD=('STD_STATUS', 'SCH_LVL', 'SCH_GRADE')", fn_code_setting);
+
+      function fn_code_setting(data) {
+        var exam_gb = '';
+        var exam_tp = '';
+        var aca_id = '[[${session.S_USER.aca_id}]]';
+
+        codeSetting('STD_STATUS', data.data, '#srch_status', '1', '', '');
+
+        $('#srch_status').val('01');
+        $('#srch_status').trigger('change');
+        table_exam_std_list.ajax.reload();
+      }
+
+      var table_exam_std_list = $('#table_exam_std_list').DataTable({
+        processing: true,
+        serverSide: true,
+        select: true,
+        responsive: true,
+        paging: true,
+        lengthChange: false,
+        searching: false,
+        ordering: true,
+        autoWidth: false,
+        responsive: true,
+        scrollCollapse: true,
+        pageLength: 10,
+        info: false,
+        language: {
+          emptyTable: '데이터가 없습니다.',
+          search: '검색:',
+          zeroRecords: '일치하는 데이터가 없습니다.',
+          loadingRecords: '로딩중...',
+          processing: '처리중...',
+        },
+        ajax: {
+          url: '/learning/learn/testBookRsltMng/getStudentListRetrieve',
+          contentType: 'application/json',
+          type: 'POST',
+          data: function (postData) {
+            formData = $('#frm_std_srch').serializeObject();
+            formData.srch_status = $('#srch_status').val();
+            Object.assign(postData, formData);
+            return JSON.stringify(postData);
+          },
+        },
+        columns: [{ data: 'std_nm' }, { data: 'class_nm' }, { data: 'ach_nml' }],
+      });
+      $('#table_exam_std_list').on('click', 'tr', function () {
+        var row = table_exam_std_list.row(this).data();
+        $('#chartDiv').remove();
+        $('#exam_result_chart').remove();
+        $('#chartRow').append("<div id='chartDiv' style='width:100%;'><canvas id='exam_result_chart' height='75'></canvas></div>");
+        fn_chart_set();
+
+        $('#std_id').val(row.std_id);
+        table_exam_list.ajax.reload();
+      });
+
+      var table_exam_list = $('#table_exam_list').DataTable({
+        processing: true,
+        serverSide: true,
+        select: true,
+        responsive: true,
+        paging: false,
+        lengthChange: false,
+        searching: false,
+        ordering: true,
+        autoWidth: false,
+        responsive: true,
+        info: false,
+        scrollCollapse: true,
+        scrollY: '20vh',
+        order: { idx: 3, dir: 'desc' },
+        style_table: { height: '90vh', maxHeight: '90vh' },
+        language: {
+          emptyTable: '데이터가 없습니다.',
+          search: '검색:',
+          zeroRecords: '일치하는 데이터가 없습니다.',
+          loadingRecords: '로딩중...',
+          processing: '처리중...',
+        },
+        ajax: {
+          url: '/learning/learn/testBookRsltMng/getExamListRetrieve',
+          contentType: 'application/json',
+          type: 'POST',
+          data: function (postData) {
+            formData = $('#frm_exam_info').serializeObject();
+            Object.assign(postData, formData);
+            return JSON.stringify(postData);
+          },
+        },
+        columns: [
+          {
+            data: null,
+            orderable: false,
+            width: '5%',
+            render: function (data, type, row, meta) {
+              return meta.row + 1;
+            },
+          }, // rownum 추가
+          { data: 'reading_lvl_nm' },
+          { data: 'book_nm' },
+          { data: 'end_dtm' },
+          { data: 'score_1' },
+          { data: 'score_2' },
+          { data: 'score_3' },
+          { data: 'score_4' },
+          { data: 'total_score' },
+          {
+            data: 'exam_dtl',
+            render: function (data, type, row) {
+              let str = '<div class="btn-group">';
+              str += "<button type='button' class='btn btn-info btn-sm' style='padding: 2px 10px 2px;' onclick=\"javascript:fn_dtl('" + row.rpt_id + "','" + row.lms_std_id + '\')">상세</button>';
+              str += '</div>';
+              return str;
+            },
+          },
+        ],
+      });
+      $('#table_exam_list').on('click', 'tr', function () {
+        var row = table_exam_list.row(this).data();
+        $('#chartDiv, #exam_result_chart').remove();
+        $('#chartRow').append("<div id='chartDiv' style='width:100%;'><canvas id='exam_result_chart' height='75'></canvas></div>");
+
+        let srch_str_date = $('#srch_str_date').val();
+        let srch_end_date = $('#srch_end_date').val();
+
+        // 성적 통계그래프
+        callAjax('/learning/learn/testBookRsltMng/getExamChartRsltRetrieve', { std_id: row.lms_std_id, srch_str_date: srch_str_date, srch_end_date: srch_end_date }, fn_exam_chart);
+      });
+      /* 성적 통계그래프 callback Function */
+      function fn_exam_chart(data) {
+        if (data.resultCode == 'S000') {
+          var datas = data.data;
+
+          let person_rslt = datas.map((data) => data.score).reverse();
+          let apply_dt = datas.map((data) => data.end_dtm).reverse();
+
+          if (apply_dt.length < 10) {
+            apply_dt = apply_dt.concat(Array(10 - apply_dt.length).fill('-'));
+          }
+
+          var ctx = document.getElementById('exam_result_chart').getContext('2d');
+          var exam_result_chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: apply_dt,
+              datasets: [
+                {
+                  label: '개인성적',
+                  type: 'line',
+                  data: person_rslt,
+                  fill: false,
+                  backgroundColor: 'rgba(47, 122, 247)',
+                  borderColor: 'rgba(47, 122, 247)',
+                  borderWidth: 1.5,
+                },
+              ],
+            },
+            options: {
+              scales: {
+                y: {
+                  suggestedMin: 50,
+                  suggestedMax: 100,
+                  ticks: {
+                    beginAtZero: true,
+                  },
+                },
+              },
+            },
+          });
+        } else {
+          swal('에러', '조회중 오류가 발생했습니다.', 'error');
+          return;
+        }
+      }
+
+      /* 원생 조회 */
+      $('#btn_student_srch').click(() => {
+        $('#chartDiv, #exam_result_chart').remove();
+        $('#chartRow').append("<div id='chartDiv' style='width:100%;'><canvas id='exam_result_chart' height='75'></canvas></div>");
+
+        fn_chart_set();
+
+        table_exam_std_list.ajax.reload();
+      });
+
+      /* 시험 조회 */
+      $('#btn_exam_srch').click(() => {
+        $('#chartDiv, #exam_result_chart').remove();
+        $('#chartRow').append("<div id='chartDiv' style='width:100%;'><canvas id='exam_result_chart' height='75'></canvas></div>");
+
+        fn_chart_set();
+
+        table_exam_list.ajax.reload();
+      });
+    });
+    /* 교재 목록 조회 */
+    function fn_sub_list_srch(STD_LVL_CD) {
+      callAjax('/learning/learn/testBookRsltMng/getBookListRetrieve', { std_lvl_cd: STD_LVL_CD }, (data) => {
+        let datas = data.data;
+
+        let str = '';
+        str += "<option value=''>선 택</option>";
+        if (datas !== null) {
+          for (let i = 0; i < datas.length; i++) {
+            str += '<option value=' + datas[i].qz_id + '>' + datas[i].qz_title + '</option>';
+          }
+        }
+
+        $('#srch_book_id').empty().append(str);
+      });
+    }
+    /* 상세 조회 */
+    function fn_dtl(rpt_id, std_id) {
+      $("#frm_rpt_info input[name='rpt_id']").val(rpt_id);
+      $("#frm_rpt_info input[name='std_id']").val(std_id);
+
+      let left = document.body.offsetWidth / 2 - screen.width / 2.5 / 2;
+      window.open('', 'rpt_info', 'height=' + screen.height + ',width=' + screen.width / 2 + ', left=' + left + '');
+
+      $('#frm_rpt_info').submit();
+    }
+
+    function fn_srch_grid_reset() {
+      $('#chartDiv').remove();
+      $('#exam_result_chart').remove();
+      $('#chartRow').append("<div id='chartDiv' style='width:100%;'><canvas id='exam_result_chart' height='75'></canvas></div>");
+      fn_chart_set();
+
+      table_exam_std_list.ajax.reload();
+    }
+
+    function fn_srch_set() {
+      $('#chartDiv').remove();
+      $('#exam_result_chart').remove();
+      $('#chartRow').append("<div id='chartDiv' style='width:100%;'><canvas id='exam_result_chart' height='75'></canvas></div>");
+      fn_chart_set();
+
+      table_exam_list.ajax.reload();
+    }
+
+    /* Chart 셋팅 */
+    function fn_chart_set() {
+      var ctx = document.getElementById('exam_result_chart').getContext('2d');
+      var exam_result_chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+          datasets: [
+            {
+              label: '개인성적',
+              type: 'line',
+              data: '',
+              fill: false,
+              backgroundColor: 'rgba(47, 122, 247)',
+              borderColor: 'rgba(47, 122, 247)',
+              borderWidth: 1.5,
+            },
+          ],
+        },
+        options: {
+          scales: {
+            y: {
+              suggestedMin: 0,
+              suggestedMax: 100,
+              ticks: {
+                beginAtZero: true,
+                max: 100,
+              },
+            },
+          },
+        },
+      });
+    }
+
+    /* 소속캠퍼스 조회 */
+    function fn_getCenter() {
+      callAjax('/common/common/centerListRetrieve', '', function (data) {
+        let str = '';
+        let datas = data.data;
+
+        if (datas.length > 0) {
+          if (datas.length == 1) {
+            str += '<option value=' + datas[0].aca_id + '>' + datas[0].aca_nm + '</option>';
+          } else {
+            str += "<option value=''>전 체</option>";
+
+            datas.forEach((element) => {
+              str += '<option value=' + element.aca_id + '>' + element.aca_nm + '</option>';
+            });
+          }
+        }
+
+        $('#srch_center').append(str).val('[[${session.S_USER.aca_id}]]').trigger('change');
+      });
+    }
+
+    /* 독서레벨 조회 */
+    function fn_get_reading_lvl() {
+      // 1 Depth
+      callAjax('/student/students/studentInfoMng/getStdReadingLvlRetrieve', { subject_cd: '02', std_lvl_cd: '', depth: 1 }, (data) => {
+        let str = '';
+        str += "<option value=''>선 택</option>";
+
+        if (data.resultCode == 'S000' && data.data.length > 0) {
+          for (let i = 0; i < data.data.length; i++) {
+            if (data.data[i].lvl_cd == data.data[i].std_lvl_cd) {
+              str += "<option value='" + data.data[i].lvl_cd + "' selected>" + data.data[i].lvl_nm + '</option>';
+            } else {
+              str += "<option value='" + data.data[i].lvl_cd + "'>" + data.data[i].lvl_nm + '</option>';
+            }
+          }
+        }
+
+        $('#std_p_lvl_cd').empty();
+        $('#std_p_lvl_cd').append(str);
+
+        fn_get_2_dep_lvl();
+      });
+    }
+
+    function fn_get_2_dep_lvl() {
+      // 2 Depth
+      callAjax('/student/students/studentInfoMng/getStdReadingLvlRetrieve', { std_p_lvl_cd: $('#std_p_lvl_cd').val(), depth: 2 }, (data) => {
+        let str = '';
+        str += "<option value=''>선 택</option>";
+
+        if (data.resultCode == 'S000' && data.data.length > 0) {
+          for (let i = 0; i < data.data.length; i++) {
+            if (data.data[i].lvl_cd == '') {
+              str += "<option value='" + data.data[i].lvl_cd + "' selected>" + data.data[i].lvl_nm + '</option>';
+            } else {
+              str += "<option value='" + data.data[i].lvl_cd + "'>" + data.data[i].lvl_nm + '</option>';
+            }
+          }
+        }
+
+        $('#std_lvl_cd').empty();
+        $('#std_lvl_cd').append(str);
+      });
+    }
+  </script>
+  <div class="content">
+    <div class="row g-0">
+      <div class="card">
+        <div class="card-header py-2"><h5>독서레벨평가 관리</h5></div>
+        <div class="card-body bg-body-tertiary">
+          <div class="px-3 py-0">
+            <form class="form-horizontal" id="frm_std_srch" name="frm_std_srch">
+              <input type="hidden" name="subject_cd" id="srch_subject_cd" />
+              <input type="hidden" name="live_chk" id="hid_live_chk" />
+              <div class="row py-1">
+                <label class="col-md-1 col-form-label col-form-label-sm text-end">소속캠퍼스</label>
+                <div class="col-md-2">
+                  <select class="form-control form-select form-select-sm" name="srch_center" id="srch_center"></select>
+                </div>
+                <label class="col-md-1 col-form-label col-form-label-sm text-end">원생상태</label>
+                <div class="col-md-2">
+                  <select multiple="multiple" class="form-select form-select-sm selectpicker" name="srch_status" id="srch_status"></select>
+                </div>
+                <label class="col-md-1 col-form-label col-form-label-sm text-end">원생정보</label>
+                <div class="col-md-4">
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-btn">
+                      <select class="form-control form-select form-select-sm" id="srch_tp" name="srch_tp">
+                        <option value="01">원생명</option>
+                        <option value="02">회원ID</option>
+                        <option value="03">원생전화번호</option>
+                        <option value="04">학부모전화번호</option>
+                        <option value="05">학부모명</option>
+                      </select>
+                    </span>
+                    <input type="text" class="form-control input-sm" id="srch_tp_inp" name="srch_tp_inp" />
+                    <span class="input-group-btn"><button type="button" class="btn btn-primary btn-sm" id="btn_student_srch" name="btn_student_srch">조회</button></span>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+          <hr />
+          <div class="row">
+            <div class="col-md-3 border-end-md border-dashed">
+              <table class="table table-sm table-striped table-bordered table-hover fs-10 mb-0" id="table_exam_std_list">
+                <thead class="bg-200">
+                  <tr>
+                    <th class="text-900">원생명</th>
+                    <th class="text-900">학급명</th>
+                    <th class="text-900">학교</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="col-md-9 border-end-md border-dashed">
+              <form class="form-horizontal" id="frm_exam_info" name="frm_exam_info">
+                <input type="hidden" name="std_id" id="std_id" />
+                <input type="hidden" name="exam_no" id="exam_no" />
+
+                <div class="row">
+                  <label class="col-md-1 col-form-label col-form-label-sm text-end">독서레벨</label>
+                  <div class="col-md-2">
+                    <div class="input-group input-group-sm">
+                      <select class="form-control form-select form-select-sm" id="std_p_lvl_cd" name="std_p_lvl_cd"></select>
+                      <select class="form-control form-select form-select-sm" id="std_lvl_cd" name="std_lvl_cd">
+                        <option value="">선 택</option>
+                      </select>
+                    </div>
+                  </div>
+                  <label class="col-md-1 col-form-label col-form-label-sm text-end">교재</label>
+                  <div class="col-md-2">
+                    <select class="form-select form-select-sm selectpicker" name="srch_book_id" id="srch_book_id" onchange="fn_srch_set();">
+                      <option value="">선 택</option>
+                    </select>
+                  </div>
+                  <label class="col-md-1 col-form-label col-form-label-sm text-end">평가일</label>
+                  <div class="col-md-2">
+                    <input class="form-control input-sm" type="text" id="srch_str_date" name="srch_str_date" istyle="date" style="width: 30%" />
+                  </div>
+                  <div class="col-md-2">
+                    <input class="form-control input-sm" type="text" name="srch_end_date" id="srch_end_date" istyle="date" dfval="today" autocomplete="off" style="width: 30%" />
+                  </div>
+                  <div class="col-md-1">
+                    <button type="button" class="btn btn-primary btn-sm" id="btn_exam_srch" name="btn_exam_srch">조회</button>
+                  </div>
+                </div>
+                <hr />
+                <div class="row">
+                  <div class="col-md-12">
+                    <table class="table table-sm table-striped table-bordered table-hover fs-10 mb-0" id="table_exam_list">
+                      <thead class="bg-200">
+                        <tr>
+                          <th class="text-900">번호</th>
+                          <!-- rownum 헤더 추가 -->
+                          <th class="text-900">독서레벨</th>
+                          <th class="text-900">교재명</th>
+                          <th class="text-900">평가일</th>
+                          <th class="text-900">어휘</th>
+                          <th class="text-900">사실</th>
+                          <th class="text-900">추론</th>
+                          <th class="text-900">비판</th>
+                          <th class="text-900">점수</th>
+                          <th class="text-900">상세</th>
+                        </tr>
+                      </thead>
+                      <tbody></tbody>
+                    </table>
+                  </div>
+                </div>
+                <hr />
+                <div class="row">
+                  <div id="chartRow">
+                    <div id="chartDiv" style="width: 100%">
+                      <canvas id="exam_result_chart" height="75"></canvas>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <form name="frm_rpt_info" id="frm_rpt_info" method="post" target="rpt_info" action="/learning/learn/testBookRsltMng/getExamDtlRetrieve">
+    <input type="hidden" name="rpt_id" />
+    <input type="hidden" name="std_id" />
+  </form>
+</html>

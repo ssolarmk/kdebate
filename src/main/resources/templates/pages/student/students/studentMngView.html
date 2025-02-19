@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/default}" layout:fragment="Content">
+  <head>
+    <title>학생 관리</title>
+    <script src="/vendors/tinymce/tinymce.min.js"></script>
+    <script src="/vendors/datatables.net/dataTables.min.js"></script>
+    <script src="/vendors/datatables.net-bs5/dataTables.bootstrap5.min.js"></script>
+    <script src="/vendors/datatables.net-fixedcolumns/dataTables.fixedColumns.min.js"></script>
+    <script src="/vendors/dropzone/dropzone-min.js"></script>
+    <script src="/js/jquery.form.js"></script>
+    <link rel="stylesheet" href="/vendors/datatables.net-bs5/dataTables.bootstrap5.min.css" />
+    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  </head>
+  <style>
+    table.dataTable tr td.dt-type-numeric {
+      text-align: left;
+    }
+  </style>
+  <script>
+    function callBackCenterList(data) {
+      let acaId = '[[${session.S_USER.aca_id}]]';
+      let datas = data.data;
+      let ID_VALUE = 'srch_center';
+      if (datas.length > 0) {
+        if (acaId == 'AC00001') {
+          acaId = '';
+        }
+        let options = ID_VALUE === 'srch_center' ? "<option value=''>전 체</option>" : '';
+
+        options += datas.map((element) => `<option value="${element.aca_id}">${element.aca_nm}</option>`).join('');
+
+        $('#srch_center').empty().append(options).val(acaId).trigger('change');
+      }
+    }
+    function replaceAll(str, searchStr, replaceStr) {
+      return str.split(searchStr).join(replaceStr);
+    }
+    function setSrchCenter() {
+      let reqUrl = '/common/common/centerListRetrieve';
+      callAjax(reqUrl, '', callBackCenterList);
+    }
+    // 공통코드 조회
+    callAjax('/common/common/totalCodelist', "CODE_GRP_CD=('STD_STATUS')", fn_code_setting);
+
+    function fn_code_setting(data) {
+      var aca_id = '[[${session.S_USER.aca_id}]]';
+
+      codeSetting('STD_STATUS', data.data, '#srch_status,#std_status,#chg_std_status', '1', '', '');
+
+      $('#srch_status').val('01').trigger('change');
+    }
+    /* 소속 캠퍼스 onChange Event  */
+    function centerChange(center_cd) {
+      $('#btn_student_srch').trigger('click');
+    }
+    setSrchCenter();
+    $(function () {
+      $('#std_create_modal').onLoadFunction();
+
+      $('#btn_student_srch').on('click', function () {
+        $('#tbl_student_list').DataTable().ajax.reload();
+      });
+
+      var tbl_student_list = $('#tbl_student_list').DataTable({
+        processing: true,
+        serverSide: true,
+        select: true,
+        responsive: true,
+        paging: true,
+        lengthChange: false,
+        searching: false,
+        ordering: true,
+        autoWidth: false,
+        responsive: true,
+        scrollCollapse: true,
+        pageLength: 20,
+        info: false,
+        order: { idx: 7, dir: 'desc' },
+        language: {
+          emptyTable: '데이터가 없습니다.',
+          search: '검색:',
+          zeroRecords: '일치하는 데이터가 없습니다.',
+          loadingRecords: '로딩중...',
+          processing: '처리중...',
+        },
+        ajax: {
+          url: '/student/students/studentMng/getStudentListRetrieve',
+          contentType: 'application/json',
+          type: 'POST',
+          data: function (postData) {
+            formData = $('#frm_student_srch').serializeObject();
+            formData.srch_status = $('#srch_status').val();
+            Object.assign(postData, formData);
+            return JSON.stringify(postData);
+          },
+        },
+        columns: [{ data: 'aca_nm' }, { data: 'std_id' }, { data: 'fn_std_nm' }, { data: 'ach_nml' }, { data: 'std_parent_hp_no' }, { data: 'addr' }, { data: 'std_status_nm' }, { data: 'ent_dttm' }],
+        columnDefs: [
+          {
+            targets: 2,
+            render: function (data, type, row, meta) {
+              var str = '<a href="javascript:fn_modal_std_info(\'' + row.std_id + '\')">' + data + '</a>';
+              return str;
+            },
+          },
+        ],
+      });
+      $('#btn_export_excel').click(function () {
+        $('#excel').html('');
+        $('#excel').append("<input type='hidden' name='title' id='title' value='캠퍼스명|원생명|원생ID|학교|연락처|학급명|상태|소속반|관리번호|미납|학부모명|학부모연락처|등록일'>");
+        $('#excel').append("<input type='hidden' name='keys' id='keys' value='aca_nm|std_nm|std_id|sch_nm|hp_no|cls_nm|std_status_nm|mgt_cls|mgt_num|unpay_yn_nm|parent_nm|std_parent_hp_no|ent_dttm|'>");
+        $('#excel').append("<input type='hidden' name='fileNm' id='fileNm' value='유저리스트'>");
+        $('#excel').append("<input type='hidden' name='queryId' id='queryId' value='com.web.kdebate.student.students.mapper.StudentMapper.getStudentListRetrieve'>");
+        $('#excel').append("<input type='hidden' name='user_id' value='" + $('#user_id').val() + "'>");
+        $('#excel').append("<input type='hidden' name='srch_center' value='" + $('#srch_center option:selected').val() + "'>");
+        $('#excel').append("<input type='hidden' name='srch_tp' value='" + $('#srch_tp option:selected').val() + "'>");
+        $('#excel').append("<input type='hidden' name='srch_status' value='" + $('#srch_status').val() + "'>");
+        $('#excel').append("<input type='hidden' name='srch_tp_inp' value='" + $('#srch_tp_inp').val() + "'>");
+
+        $('#excel').submit();
+      });
+      /* 학생 정보 저장 */
+      $('#btn_std_info_update').click(function () {
+        var parent_hp_no = replaceAll($('form[name=frm_student_info] #parent_hp_no').val(), '-', '');
+
+        if ($('#std_nm').val() == '') {
+          swal('경고', '원생명을 입력해주세요.', 'warning');
+          return;
+        }
+
+        if (parent_hp_no != '') {
+          var c_parent_hp_no = replaceAll($('form[name=frm_student_info] #c_parent_hp_no').val(), '-', '');
+
+          if (parent_hp_no != replaceAll($('#rep_parent_hp_no').val(), '-', '')) {
+            if (parent_hp_no != c_parent_hp_no) {
+              $('#parent_hp_no_cnfm').val('');
+            }
+
+            if ($('form[name=frm_student_info] #parent_hp_no_cnfm').val() == '') {
+              swal('경고', '학부모 연락처 중복확인을 해주십시오.', 'warning');
+              return;
+            } else if ($('form[name=frm_student_info] #parent_hp_no_cnfm').val() == 'N') {
+              swal('경고', '중복된 학부모 연락처입니다.', 'warning');
+              return;
+            }
+          }
+        }
+        ConfirmdialogToAjax('create', '/student/students/studentInfoMng/studentInfoUpdate', $('#frm_student_info').serialize(), function (data) {
+          if (data.resultCode == 'S000') {
+            swal('성공', '작업을 정상적으로 완료하였습니다.', 'success');
+          }
+        });
+      });
+      $('#btn_add_std').click(function () {
+        $('form[name=frm_std_info] input[name=c_parent_hp_no]').val('');
+        $('form[name=frm_std_info] input[name=c_parent_id]').val('');
+        $('#frm_std_info').clearForm();
+
+        var aca_nm = '[[${session.S_USER.aca_nm}]]';
+        $('form[name=frm_std_info] input[name=std_aca_nm]').val(aca_nm);
+
+        $('form[name=frm_std_info] input[name=std_id]').removeAttr('readonly');
+        $('#btn_std_id_cnfm').removeAttr('disabled');
+
+        $('#std_create_modal').modal('show');
+        $('form[name=frm_std_info] input[name=std_id]').focus();
+      });
+
+      $('#btn_std_create').click(function () {
+        $("#frm_std_info input[name='aca_id']").val('[[${session.S_USER.aca_id}]]');
+
+        var parent_hp_no = $('form[name=frm_std_info] input[name=parent_hp_no]').val();
+        var c_parent_hp_no = $('form[name=frm_std_info] input[name=c_parent_hp_no]').val();
+        $('form[name=frm_std_info] input[name=std_pwd]').val($(this).val().trim());
+
+        if (parent_hp_no != '') {
+          if (parent_hp_no != c_parent_hp_no) {
+            $('#parent_hp_no_cnfm').val('');
+          }
+        }
+
+        var std_id_set = $('input[type=radio][name=std_id_set]:checked').val();
+        if (std_id_set == '01' || std_id_set == '03') {
+          if ($('form[name=frm_std_info] input[name=std_id]').val() == '') {
+            swal('경고', '아이디을 입력해 주십시오.', 'warning');
+            return;
+          } else if ($('form[name=frm_std_info] input[name=std_id_cnfm]').val() == '' || $('form[name=frm_std_info] input[name=std_id]').val() != $('form[name=frm_std_info] input[name=c_std_id]').val()) {
+            swal('경고', '아이디 중복확인을 해주십시오.', 'warning');
+            return;
+          } else if ($('form[name=frm_std_info] input[name=std_id_cnfm]').val() == 'N') {
+            swal('경고', '중복된 아이디입니다.', 'warning');
+            return;
+          }
+        }
+
+        if ($('form[name=frm_std_info] input[name=std_nm]').val() == '') {
+          swal('경고', '원생명을 입력해 주십시오.', 'warning');
+          return;
+        } else if ($('form[name=frm_std_info] input[name=std_gender]').val() == '') {
+          swal('경고', '성별을 선택해 주십시오.', 'warning');
+          return;
+        } else if ($('form[name=frm_std_info] input[name=std_status]').val() == '') {
+          swal('경고', '재원상태를 입력해주세요.', 'warning');
+          return;
+        } else if (parent_hp_no != '') {
+          if ($('form[name=frm_std_info] input[name=parent_hp_no_cnfm]').val() == '') {
+            swal('경고', '학부모 연락처 중복확인을 해주십시오.', 'warning');
+            return;
+          } else if ($('form[name=frm_std_info] input[name=parent_hp_no_cnfm]').val() == 'N') {
+            swal('경고', '중복된 학부모 연락처입니다.', 'warning');
+            return;
+          }
+
+          if ($('form[name=frm_std_info] input[name=parent_gb_cd]').val() == '') {
+            $('form[name=frm_std_info] input[name=parent_gb_cd]').val('01');
+          }
+
+          if ($('form[name=frm_std_info] input[name=parent_nm]').val() == '') {
+            var stdNm = $('form[name=frm_std_info] input[name=std_nm]').val();
+            $('form[name=frm_std_info] input[name=parent_nm]').val(stdNm + ' 부모');
+          }
+        }
+        ConfirmdialogToAjax('create', '/student/students/studentMng/studentInfoCreate', $('#frm_std_info').serialize(), function (data) {
+          if (data.resultCode == 'S000') {
+            swal('성공', '작업을 정상적으로 완료하였습니다.', 'success');
+            $('#frm_std_info').clearForm();
+            $('#std_info_modal').modal('hide');
+            tbl_student_list.ajax.reload();
+          }
+        });
+      });
+      /* 원생 아이디 중복 체크 */
+      $('#btn_std_id_cnfm').click(function () {
+        var std_id = $('form[name=frm_std_info] input[name=std_id]').val().trim();
+        var std_id_set = $('input[type=radio][name=std_id_set]:checked').val();
+
+        if (std_id_set != '02') {
+          if (std_id == '') {
+            swal('실패', '아이디를 입력해주세요.', 'error');
+            return;
+          }
+        }
+
+        callAjax('/student/students/studentMng/getStudentIdConfirm', 'std_id=' + std_id, function (data) {
+          if (data.resultCode == 'S000') {
+            if (data.data.chk_std_id == 0) {
+              $('form[name=frm_std_info] input[name=std_id_cnfm]').val('Y');
+              $('form[name=frm_std_info] input[name=c_std_id]').val(std_id);
+              $('form[name=frm_std_info] input[name=std_id]').val(std_id);
+
+              swal('성공', '사용가능한 아이디입니다.', 'success');
+            } else {
+              $('form[name=frm_std_info] input[name=std_id_cnfm]').val('N');
+              $('form[name=frm_std_info] input[name=c_std_id]').val('');
+
+              if (std_id_set == '01') {
+                swal('경고', '중복된 아이디입니다.', 'error');
+                return;
+              }
+              if (std_id_set == '03') {
+                swal('경고', '중복된 아이디입니다.', 'error');
+              }
+            }
+          }
+        });
+      });
+
+      /* 학부모 번호 중복 체크  */
+      $('#btn_hp_dup_chk').click(function () {
+        var aca_id = $('form[name=frm_std_info] input[name=aca_id]').val().trim();
+        var parent_hp_no = $('form[name=frm_std_info] input[name=parent_hp_no]').val().trim();
+
+        $('form[name=frm_std_info] input[name=parent_hp_no_cnfm]').val('Y');
+        $('form[name=frm_std_info] input[name=c_parent_hp_no]').val(parent_hp_no);
+        $('form[name=frm_std_info] input[name=parent_hp_no]').val(parent_hp_no);
+
+        swal('성공', '사용가능한 번호입니다.', 'success');
+      });
+    });
+    function fn_modal_std_info(std_id) {
+      callAjax('/student/students/studentInfoMng/infoView', 'std_id=' + std_id, function (data) {
+        $('#frm_student_info').autoMapping(data.data);
+        var lvl_cd = data.data.std_lvl_cd;
+        /* 독서레벨 조회 */
+        fn_get_reading_lvl();
+
+        $('#std_p_lvl_cd').change((e) => {
+          fn_get_2_dep_lvl();
+        });
+        function fn_get_reading_lvl() {
+          // 1 Depth
+          callAjax('/student/students/studentInfoMng/getStdReadingLvlRetrieve', { subject_cd: '02', std_lvl_cd: lvl_cd, depth: 1 }, (data) => {
+            let str = '';
+            str += "<option value=''>선 택</option>";
+
+            if (data.resultCode == 'S000' && data.data.length > 0) {
+              for (let i = 0; i < data.data.length; i++) {
+                if (data.data[i].lvl_cd == data.data[i].std_lvl_cd) {
+                  str += "<option value='" + data.data[i].lvl_cd + "' selected>" + data.data[i].lvl_nm + '</option>';
+                } else {
+                  str += "<option value='" + data.data[i].lvl_cd + "'>" + data.data[i].lvl_nm + '</option>';
+                }
+              }
+            }
+
+            $('#std_p_lvl_cd').empty();
+            $('#std_p_lvl_cd').append(str);
+
+            fn_get_2_dep_lvl();
+          });
+        }
+        function fn_get_2_dep_lvl() {
+          // 2 Depth
+          callAjax('/student/students/studentInfoMng/getStdReadingLvlRetrieve', { std_p_lvl_cd: $('#std_p_lvl_cd').val(), depth: 2 }, (data) => {
+            let str = '';
+            str += "<option value=''>선 택</option>";
+
+            if (data.resultCode == 'S000' && data.data.length > 0) {
+              for (let i = 0; i < data.data.length; i++) {
+                if (data.data[i].lvl_cd == lvl_cd) {
+                  str += "<option value='" + data.data[i].lvl_cd + "' selected>" + data.data[i].lvl_nm + '</option>';
+                } else {
+                  str += "<option value='" + data.data[i].lvl_cd + "'>" + data.data[i].lvl_nm + '</option>';
+                }
+              }
+            }
+
+            $('#std_lvl_cd').empty();
+            $('#std_lvl_cd').append(str);
+          });
+        }
+      });
+
+      $('#std_info_modal').modal('show');
+    }
+    /* 원생 등록 생년월일 onchange 이벤트  */
+    function fn_birth_onchange(obj) {
+      var date = new Date();
+      var birth = obj.value;
+      birth = birth.replaceAll('-', ',');
+
+      var birthDay = new Date(birth);
+      let age = date.getFullYear() - birthDay.getFullYear() + 1;
+
+      obj.form.std_age.value = age;
+    }
+
+    /* 원생 등록 생년월일 계산 */
+    function fn_std_age_onchange(obj) {
+      var date = new Date();
+      var year = date.getFullYear();
+      year = parseInt(year) - parseInt($(obj).val()) + 1;
+      var birth = year + '-01-01';
+
+      obj.form.std_birth.value = birth;
+    }
+    /* 원생 등록 생년월일 onchange 이벤트  */
+    function fn_std_birth_onchange(obj) {
+      var date = new Date();
+      var birth = obj.value;
+      birth = birth.replaceAll('-', ',');
+
+      var birthDay = new Date(birth);
+      let age = date.getFullYear() - birthDay.getFullYear() + 1;
+
+      callAjax('/common/common/getSelectAgeOfDate', { date: birth }, function (result) {
+        if (result.resultCode == 'S000') {
+          obj.form.std_age.value = result.data;
+        }
+      });
+    }
+    /* 원생등록 원생전화 입력 onchange */
+    function fn_std_hp_no(obj) {
+      $('#std_id_cnfm').val('');
+
+      var std_id_set = $('input[type=radio][name=std_id_set]:checked').val();
+      if (std_id_set == '03') {
+        var hp_no = obj.replace(/-/g, '');
+
+        if (hp_no.length >= 11) {
+          hp_no = hp_no.substr(3, hp_no.length);
+          $('#info_std_id').val(hp_no);
+        } else {
+          $('#info_std_id').val(hp_no);
+        }
+      }
+    }
+    function openZipSearch() {
+      new daum.Postcode({
+        oncomplete: function (data) {
+          // 팝업에서 검색결과 항목을 클릭했을때 실행할 코드를 작성하는 부분.
+          var addr = ''; // 주소 변수
+
+          //사용자가 선택한 주소 타입에 따라 해당 주소 값을 가져온다.
+          if (data.userSelectedType === 'R') {
+            // 사용자가 도로명 주소를 선택했을 경우
+            addr = data.roadAddress;
+          } else {
+            // 사용자가 지번 주소를 선택했을 경우(J)
+            addr = data.jibunAddress;
+          }
+
+          // 우편번호와 주소 정보를 해당 필드에 넣는다.
+          $('#std_zip_code').val(data.zonecode);
+          $('#std_addr').val(addr);
+          $('#std_addr_dtl').val('');
+          $('#std_addr_dtl').focus();
+        },
+      }).open();
+    }
+    function fn_std_hp_no(obj) {
+      $('#std_id_cnfm').val('');
+
+      var std_id_set = $('input[type=radio][name=std_id_set]:checked').val();
+      if (std_id_set == '03') {
+        var hp_no = obj.replace(/-/g, '');
+
+        if (hp_no.length == 11) {
+          hp_no = hp_no.substr(3, 8);
+          $('form[name=frm_std_info] #std_id').val(hp_no);
+        } else {
+          $('form[name=frm_std_info] #std_id').val(hp_no);
+        }
+      }
+    }
+  </script>
+  <div class="content">
+    <div class="card mb-12">
+      <div class="card-header"><h5>학생 관리</h5></div>
+      <div class="card-body bg-body-tertiary">
+        <form id="frm_student_srch" name="frm_student_srch">
+          <input type="hidden" id="hidden_curri_conts" name="hidden_curri_conts" value="" />
+          <input type="hidden" id="hidden_subject" name="hidden_subject" value="" />
+          <div class="row px-3 py-0">
+            <label class="col-md-1 col-form-label col-form-label-sm" for="srch_center">소속캠퍼스</label>
+            <div class="col-md-2">
+              <select class="form-control form-select form-select-sm" name="srch_center" id="srch_center" onchange="centerChange(this.value);"></select>
+            </div>
+            <label class="col-md-1 col-form-label col-form-label-sm" for="srch_status">원생상태</label>
+            <div class="col-md-2">
+              <select class="form-select selectpicker" multiple="multiple" name="srch_status" id="srch_status"></select>
+            </div>
+            <label class="col-md-1 col-form-label col-form-label-sm" for="srch_tp">원생정보</label>
+            <div class="col-md-4">
+              <div class="input-group input-group-sm">
+                <span class="input-group-btn">
+                  <select class="form-control form-select form-select-sm" id="srch_tp" name="srch_tp">
+                    <option value="01">원생명</option>
+                    <option value="02">회원ID</option>
+                    <option value="03">원생전화번호</option>
+                    <option value="04">학부모전화번호</option>
+                    <option value="05">학부모명</option>
+                  </select>
+                </span>
+                <input type="text" class="form-control input-sm" id="srch_tp_inp" name="srch_tp_inp" />
+                <span class="input-group-btn"><button type="button" class="btn btn-primary btn-sm" id="btn_student_srch" name="btn_student_srch">조회</button></span>
+              </div>
+            </div>
+          </div>
+        </form>
+        <hr />
+        <div class="row">
+          <div class="col-md-12 text-end">
+            <button class="btn btn-primary btn-sm" id="btn_add_std"><i class="fa fa-check"></i> <strong>원생 등록</strong></button>
+            <button class="btn btn-success btn-sm" id="btn_export_excel"><i class="fa fa-file-excel"></i> <strong>EXCEL</strong></button>
+          </div>
+        </div>
+        <table class="table table-sm table-striped table-bordered table-hover fs-10 mb-0" id="tbl_student_list">
+          <thead class="bg-200">
+            <tr>
+              <th class="text-900">캠퍼스명</th>
+              <th class="text-900">ID</th>
+              <th class="text-900">원생명</th>
+              <th class="text-900">학교</th>
+              <th class="text-900">연락처</th>
+              <th class="text-900">주소</th>
+              <th class="text-900">상태</th>
+              <th class="text-900">등록일</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="modal fade" id="std_info_modal" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg mt-6" role="document">
+      <div class="modal-content border-0">
+        <div class="position-absolute top-0 end-0 mt-2 me-2 z-1"><button class="btn-close btn btn-sm btn-circle d-flex flex-center transition-base" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body p-0">
+          <div class="rounded-top-3 bg-body-tertiary py-3 ps-4 pe-6">
+            <h4 class="mb-0 align-middle" id="staticBackdropLabel">원생 상세 정보</h4>
+          </div>
+          <div class="p-1">
+            <div class="row">
+              <div class="col-lg-12">
+                <form id="frm_student_info" name="frm_student_info">
+                  <input type="hidden" id="std_id" name="std_id" value="" />
+                  <input type="hidden" id="aca_id" name="aca_id" value="" />
+                  <input type="hidden" id="aca_nm" name="aca_nm" value="" />
+                  <input type="hidden" id="sch_lvl_hid" name="sch_lvl_hid" value="" />
+                  <input type="hidden" id="sch_grade_hid" name="sch_grade_hid" value="" />
+                  <input type="hidden" id="std_status_hid" name="std_status_hid" value="" />
+                  <input type="hidden" id="mng_class_hid" name="mng_class_hid" value="" />
+                  <input type="hidden" id="std_url" value="" />
+                  <input type="hidden" id="atd_send_yn" name="atd_send_yn" value="" />
+                  <input type="hidden" id="lev_send_yn" name="lev_send_yn" value="" />
+                  <input type="hidden" id="exam_send_yn" name="exam_send_yn" value="" />
+                  <input type="hidden" id="atd_dup_chk" name="atd_dup_chk" value="" />
+                  <input type="hidden" id="c_atd_chk_cd" name="c_atd_chk_cd" value="" />
+                  <input type="hidden" name="rows" id="rows" value="10" />
+                  <input type="hidden" name="page" id="page" value="1" />
+                  <input type="hidden" id="parent_hp_no_cnfm" name="parent_hp_no_cnfm" value="" />
+                  <input type="hidden" id="c_parent_hp_no" name="c_parent_hp_no" value="" />
+                  <input type="hidden" id="c_parent_id" name="c_parent_id" value="" />
+                  <input type="hidden" name="rep_parent_hp_no" id="rep_parent_hp_no" value="" />
+                  <input type="hidden" name="rep_parent_id" id="rep_parent_id" value="" />
+                  <input type="hidden" name="dc_yn" id="dc_yn" value="" />
+                  <input type="hidden" id="study_live_chk_yn" name="study_live_chk_yn" value="" />
+                  <input type="hidden" id="study_care_chk_yn" name="study_care_chk_yn" value="" />
+                  <input type="hidden" id="auto_inv_yn" name="auto_inv_yn" value="" />
+                  <div class="card">
+                    <div class="card-body">
+                      <div class="row">
+                        <div class="row py-1">
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">원생명</label>
+                          <div class="col-md-4">
+                            <input type="text" class="form-control form-control-sm" id="std_nm" name="std_nm" value="" />
+                          </div>
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">소속 캠퍼스</label>
+                          <div class="col-md-4">
+                            <input type="text" class="form-control form-control-sm" name="aca_nm" id="aca_nm" disabled value="" />
+                          </div>
+                        </div>
+                        <div class="row py-1" id="std_id_origin">
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">아이디</label>
+                          <div class="col-md-4">
+                            <input type="text" class="form-control form-control-sm" name="std_id" id="std_id" disabled value="" />
+                          </div>
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">패스워드</label>
+                          <div class="col-md-4">
+                            <input type="text" class="form-control form-control-sm" name="cnct_pwd" id="cnct_pwd" />
+                          </div>
+                        </div>
+                        <div class="row py-1">
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">생년월일</label>
+                          <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" name="birth" id="birth" value="" autocomplete="off" onchange="fn_birth_onchange(this);" />
+                          </div>
+                          <div class="col-md-1" style="padding-left: 0px">
+                            <div class="input-group input-group-sm">
+                              <input type="text" class="form-control form-control-sm" id="std_age" name="std_age" onchange="fn_std_age_onchange(this);" value="" style="width: 65%" />
+                              <span>세</span>
+                            </div>
+                          </div>
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">이메일</label>
+                          <div class="col-md-4">
+                            <input type="text" class="form-control form-control-sm" id="email" name="email" value="" istyle="email" />
+                          </div>
+                        </div>
+                        <div class="row py-1">
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">학부모명</label>
+                          <div class="col-md-4">
+                            <input type="text" class="form-control form-control-sm" id="rep_parent_nm" name="rep_parent_nm" disabled value="" />
+                          </div>
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">학부모관계</label>
+                          <div class="col-md-4" id="rep_parent_info_origin">
+                            <input type="text" class="form-control form-control-sm" id="rep_parent_gb" name="rep_parent_gb" disabled value="" />
+                          </div>
+                        </div>
+                        <div class="row py-1">
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">학부모번호</label>
+                          <div class="col-md-4">
+                            <input type="text" class="form-control form-control-sm" name="parent_hp_no" id="parent_hp_no" istyle="phone" value="" />
+                          </div>
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">원생전화</label>
+                          <div class="col-md-4">
+                            <input type="text" class="form-control form-control-sm" name="hp_no" id="hp_no" value="" istyle="phone" onkeyup="fn_std_hp_no(this.value);" />
+                          </div>
+                        </div>
+                        <div class="row py-1">
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">주소</label>
+                          <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" id="zip_code" name="zip_code" disabled value="" placeholder="우편번호" />
+                          </div>
+                          <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" id="addr" name="addr" disabled value="" placeholder="기본주소" />
+                          </div>
+                          <div class="col-md-4">
+                            <input type="text" class="form-control form-control-sm" id="addr_dtl" name="addr_dtl" value="" placeholder="상세주소" />
+                          </div>
+                        </div>
+                        <div class="row py-1">
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">재원상태</label>
+                          <div class="col-md-4" id="std_status_origin">
+                            <input type="text" class="form-control form-control-sm" id="std_status_nm" name="std_status_nm" value="" disabled />
+                          </div>
+                          <label class="col-md-2 col-form-label col-form-label-sm text-end">독서레벨</label>
+                          <div class="col-md-4">
+                            <div class="input-group input-group-sm">
+                              <select class="form-control form-select form-select-sm" id="std_p_lvl_cd" name="std_p_lvl_cd"></select>
+                              <select class="form-control form-select form-select-sm" id="std_lvl_cd" name="std_lvl_cd">
+                                <option value="">선 택</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" id="btn_std_info_update">저장</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal modal-xl fade" id="std_create_modal" data-bs-keyboard="false" data-bs-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl mt-6" role="document">
+      <div class="modal-content border-0">
+        <div class="position-absolute top-0 end-0 mt-2 me-2 z-1"><button class="btn-close btn btn-sm btn-circle d-flex flex-center transition-base" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body p-0">
+          <div class="rounded-top-3 bg-body-tertiary py-3 ps-4 pe-6">
+            <h4 class="mb-0 align-middle" id="staticBackdropLabel">원생 등록</h4>
+          </div>
+          <div class="p-1">
+            <div class="row">
+              <div class="col-lg-12">
+                <form id="frm_std_info" name="frm_std_info">
+                  <input type="hidden" id="create_aca_id" name="aca_id" value="[[${session.S_USER.aca_id}]]" />
+                  <input type="hidden" id="create_std_use_yn" name="std_use_yn" value="Y" />
+                  <input type="hidden" id="create_atd_dup_chk" name="atd_dup_chk" />
+                  <input type="hidden" id="create_c_atd_chk_cd" name="c_atd_chk_cd" />
+                  <input type="hidden" id="create_std_id_cnfm" name="std_id_cnfm" />
+                  <input type="hidden" id="create_c_std_id" name="c_std_id" />
+                  <input type="hidden" id="create_parent_hp_no_cnfm" name="parent_hp_no_cnfm" />
+                  <input type="hidden" id="create_c_parent_hp_no" name="c_parent_hp_no" />
+                  <input type="hidden" id="create_c_parent_id" name="c_parent_id" />
+                  <div class="card">
+                    <div class="card-body">
+                      <div class="row">
+                        <div class="row py-1">
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">캠퍼스명</label>
+                          <div class="col-md-5">
+                            <input type="text" class="form-control form-control-sm" name="std_aca_nm" id="std_aca_nm" disabled />
+                          </div>
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">아이디</label>
+                          <div class="col-md-1">
+                            <label class="radio-inline">
+                              <input type="radio" class="radiobox" name="std_id_set" value="01" onchange="fn_std_id_set(this.value)" checked />
+                              <span>직접</span>
+                            </label>
+                          </div>
+                          <div class="col-md-1">
+                            <label class="radio-inline">
+                              <input type="radio" class="radiobox" name="std_id_set" value="02" onchange="fn_std_id_set(this.value)" />
+                              <span>자동</span>
+                            </label>
+                          </div>
+                          <div class="col-md-1">
+                            <label class="radio-inline">
+                              <input type="radio" class="radiobox" name="std_id_set" value="03" onchange="fn_std_id_set(this.value)" />
+                              <span>HP</span>
+                            </label>
+                          </div>
+                        </div>
+                        <div class="row py-1">
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">아이디</label>
+                          <div class="col-md-5">
+                            <div class="input-group input-group-sm">
+                              <input type="text" class="form-control form-control-sm" name="std_id" id="std_id" />
+                              <div class="input-group-btn">
+                                <button type="button" class="btn btn-primary btn-sm" id="btn_std_id_cnfm"><i class="fa fa-check"></i> <strong>중복확인</strong></button>
+                              </div>
+                            </div>
+                          </div>
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">패스워드</label>
+                          <div class="col-md-5">
+                            <input type="password" class="form-control form-control-sm" name="std_pwd" id="std_pwd" />
+                          </div>
+                        </div>
+                        <div class="row py-1">
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">원생명</label>
+                          <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" id="std_nm" name="std_nm" />
+                          </div>
+                          <div class="col-md-2">
+                            <select class="form-control form-select form-select-sm" id="std_gender" name="std_gender">
+                              <option value="">선 택</option>
+                              <option value="1" selected>남성</option>
+                              <option value="2">여성</option>
+                            </select>
+                          </div>
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">생년월일</label>
+                          <div class="col-md-3">
+                            <input type="text" class="form-control form-control-sm" name="std_birth" istyle="date" id="std_birth" onchange="fn_std_birth_onchange(this);" autocomplete="off" />
+                          </div>
+                          <div class="col-md-2">
+                            <div class="input-group input-group-sm">
+                              <input type="text" class="form-control form-control-sm" id="std_age" name="std_age" onchange="fn_std_age_onchange(this);" />
+                              <span class="input-group-text">세</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="row py-1">
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">재원상태</label>
+                          <div class="col-md-5">
+                            <select class="form-control form-select form-select-sm" name="std_status" id="std_status"></select>
+                          </div>
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">이메일</label>
+                          <div class="col-md-5">
+                            <input type="text" class="form-control form-control-sm" id="std_email" name="std_email" istyle="email" />
+                          </div>
+                        </div>
+                        <div class="row py-1">
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">부모번호</label>
+                          <div class="col-md-5">
+                            <div class="input-group">
+                              <span class="input-group-text"><h1 class="fa fa-phone"></h1></span>
+                              <input type="text" class="form-control form-control-sm" name="parent_hp_no" id="parent_hp_no" maxlength="13" />
+                              <button type="button" class="btn btn-primary btn-sm" id="btn_hp_dup_chk"><i class="fa fa-check"></i> <strong>중복확인</strong></button>
+                            </div>
+                          </div>
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">원생번호</label>
+                          <div class="col-md-5">
+                            <input type="text" class="form-control form-control-sm" name="std_hp_no" id="std_hp_no" istyle="phone" maxlength="13" onkeyup="fn_std_hp_no(this.value);" />
+                          </div>
+                        </div>
+                        <div class="row py-1">
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">학부모명</label>
+                          <div class="col-md-5">
+                            <input type="text" class="form-control form-control-sm" id="parent_nm" name="parent_nm" />
+                          </div>
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">관계</label>
+                          <div class="col-md-5">
+                            <select class="form-control form-control-sm" name="parent_gb_cd" id="parent_gb_cd"></select>
+                          </div>
+                        </div>
+                        <div class="row py-1">
+                          <label class="col-md-1 col-form-label col-form-label-sm text-end">주소</label>
+                          <div class="col-md-2">
+                            <input type="text" class="form-control form-control-sm" id="std_zip_code" name="std_zip_code" onclick="openZipSearch();" readonly="readonly" placeholder="우편번호" />
+                          </div>
+                          <div class="col-md-4">
+                            <input type="text" class="form-control form-control-sm" id="std_addr" name="std_addr" onclick="openZipSearch();" readonly="readonly" placeholder="기본주소" />
+                          </div>
+                          <div class="col-md-5">
+                            <input type="text" class="form-control form-control-sm" id="std_addr_dtl" name="std_addr_dtl" placeholder="상세주소" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" id="btn_std_create">저장</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <form name="excel" id="excel" action="/common/common/excelExport" method="POST"></form>
+</html>

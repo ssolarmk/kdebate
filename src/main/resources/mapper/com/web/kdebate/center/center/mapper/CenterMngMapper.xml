@@ -1,0 +1,1306 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.web.kdebate.center.center.mapper.CenterMngMapper">
+	<select id="getCenterMngListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CenterMngMapper.getCenterMngListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   A.ACA_NM AS aca_nm
+		     , A.ACA_ID AS aca_id
+		     , B.HP_NO AS hp_no
+		     , FC_GET_CODE_NM('CONT_STAT', A.CONT_STAT) AS cont_stat_nm
+		     , A.CONT_STAT AS cont_stat
+		     , A.ENT_USER_ID AS ent_user_id
+		     , DATE_FORMAT(A.ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS ent_dttm
+		     , A.BOSS_NM AS boss_nm
+		     , A.BOSS_ID AS boss_id
+		     , B.USER_PWD AS user_pwd
+		     , A.ACA_TP AS aca_tp
+		     , A.SALES_GRADE AS sales_grade
+		     , A.JISA_CD AS jisa_cd
+		     , A.BIZ_NO AS biz_no
+		     , A.TEL_NO AS tel_no
+		     , A.EMAIL AS email
+		     , A.ADDR AS addr
+		     , A.ZIP_NO AS zip_no
+		     , A.ADDR_DTL AS addr_dtl
+		     , A.HOMPAGE AS hompage
+		     , A.OPEN_TM AS open_tm
+		     , A.CLOSE_TM AS close_tm
+		     , A.USE_YN	AS use_yn
+		     , C.LOGO_USE_YN	AS logo_use_yn
+		     , C.LOGO_IMG_PATH	AS logo_img_path
+		     , C.LOGO_FILE_NM	AS logo_file_nm
+		     , A.PCODE_USE_YN	AS pcode_use_yn
+		     , C.LEVEL_USE_YN	AS level_use_yn
+		     , C.CURRI_USE_YN	AS curri_use_yn
+		     , C.CLASS_PERIOD_TYPE	AS class_period_type
+		     , C.INVOICE_ISSUE_AUTO_YN	AS invoice_issue_auto
+		     , C.INVOICE_ISSUE_TYPE	AS invoice_isssue_type
+		     , C.INVOICE_ISSUE_DAY	AS invoice_issue_day
+		     , C.FILE_LIMIT	AS file_limit
+		     , C.HOMEPAGE_USE_YN	AS homepage_use_yn
+		     , C.HOMEPAGE_URL	AS homepage_url
+		     , C.EXAM_SYS_USE_YN	AS exam_sys_use_yn
+		     , C.RATING_SYS_USE_YN	AS rating_sys_use_yn
+		     , C.RATING_SYS_TYPE 	AS rating_sys_type
+		     , C.RECEIPT_PRINT_YN 	AS receipt_print_yn
+		     , C.RECEIPT_PRINT_TEXT	AS receipt_print_text
+		     , C.RECEIPT_PRINT_STD_INFO_YN AS receipt_print_std
+		     , C.RECEIPT_PRINT_GOODS_INFO_YN AS receipt_print_goods_info_yn
+		     , C.ACA_OPER_TP		AS aca_oper_tp
+		     , C.LIVE_CLASS_OPER_YN AS live_class_oper_yn
+		     , GROUP_CONCAT(E.SCH_EDU_MGT_CD) AS office_of_education
+		     , D.PG_STORE_ID AS pg_store_id
+		     , D.PG_USER_ID AS pg_user_id
+		     , D.CRYPTO_KEY AS pg_crypto_key
+		     , A.LIC_CONT_TP AS lic_cont_tp
+		     , A.LIC_AMT_MON AS lic_amt_mon
+		     , A.LIC_AMT_STD AS lic_amt_std
+		     , D.PAY_RATE AS pg_pay_rate
+		     , D.PAY_DAY AS pg_pay_day
+		     , A.SMS_AUTH_CODE AS pg_sms_auth_code
+		     , A.SMS_UID AS sms_uid
+		     , A.SMS_PREPAY_YN AS sms_prepay_yn
+		     , A.SMS_PRICE	AS sms_price
+		     , A.LMS_PRICE	AS lms_price
+		     , A.MMS_PRICE	AS mms_price
+		     , A.RCS_PRICE	AS rcs_price
+		     , A.KATALK_PRICE	AS katalk_price
+		     , D.AUTH_YN AS auth_yn
+		     , A.BIZ_NM AS biz_nm
+			 , A.MIG_A_CODE AS mig_a_code
+			 , A.MIG_HOME_CODE AS mig_home_code
+		  FROM TB_ACA A
+		  LEFT OUTER JOIN TB_USER B
+		    ON A.BOSS_ID = B.USER_ID
+		  LEFT OUTER JOIN TB_ACA_OPTION C
+		  	ON C.ACA_ID = A.ACA_ID
+		  LEFT OUTER JOIN TB_ACA_SCH_MGT E
+		   	ON E.ACA_ID = A.ACA_ID
+		  JOIN TB_SALES_CORP D ON D.CORP_CD = A.ACA_ID
+		 WHERE 1=1
+		   AND P_ACA_ID = (SELECT D.ACA_ID FROM TB_USER D WHERE D.USER_ID = #{user_id})
+	     <if test="srch_dt != ''">
+		 	<if test="srch_dt == 'reg_dt'">
+		 		<choose>
+		 			<when test="srch_st_inp != '' and srch_ed_inp == ''">
+		 				AND A.ENT_DTTM <![CDATA[>=]]> #{srch_st_inp}
+		 			</when>
+		 			<when test="srch_st_inp == '' and srch_ed_inp != ''">
+		 				AND A.ENT_DTTM <![CDATA[<=]]> #{srch_ed_inp}
+		 			</when>
+		 			<otherwise>
+		 				AND A.ENT_DTTM BETWEEN #{srch_st_inp} AND #{srch_ed_inp}
+		 			</otherwise>
+	 			</choose>
+		 	</if>
+		 </if>
+		 <if test="srch_tp != ''">
+		 	<if test="srch_tp == 'name_tp'">
+		 		AND A.ACA_NM LIKE CONCAT('%',#{srch_center_inp},'%')
+		 	</if>
+		 	<if test="srch_tp == 'id_tp'">
+		 		AND A.ACA_ID LIKE CONCAT('%',#{srch_center_inp},'%')
+		 	</if>
+		 </if>
+		 <if test='cont_stat != null and cont_stat != ""'>
+		 	AND A.CONT_STAT = #{cont_stat}
+		 </if>
+		 GROUP BY A.ACA_ID
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select>
+
+	<select id="getContractListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CenterMngMapper.getContractListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   ACA_ID as cont_aca_id
+			 , SEQ as cont_seq
+			 , CONCAT(DATE_FORMAT(STR_DT, '%Y-%m-%d'), ' ~ ', DATE_FORMAT(END_DT, '%Y-%m-%d')) AS cont_period
+		     , CONT_USR_NM AS cont_usr_nm
+		     , CONT_AMT AS cont_amt
+		     , DATE_FORMAT(CONT_DT, '%Y-%m-%d') AS cont_dt
+		     , FC_GET_CODE_NM('CONT_GB', CONT_GB) AS cont_gb_nm
+		     , CONT_GB AS cont_gb
+		     , FC_GET_CODE_NM('PAY_WAY', PAY_WAY) AS pay_way_nm
+		     , PAY_WAY AS pay_way
+		     , DATE_FORMAT(STR_DT, '%Y-%m-%d') AS str_dt
+		     , DATE_FORMAT(END_DT, '%Y-%m-%d') AS end_dt
+		     , CONT_TEL_NO AS cont_tel_no
+		     , DATE_FORMAT(PAY_DT, '%Y-%m-%d') AS pay_dt
+		     , DATE_FORMAT(ENT_DTTM, '%Y-%m-%d') AS cont_ent_dttm
+		     , ENT_USER_ID AS cont_ent_user_id
+		  FROM TB_ACA_CONT
+		 WHERE 1=1
+		   AND ACA_ID = #{aca_id}
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select>
+
+<select id="getLedgerListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CenterMngMapper.getLedgerListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   ACA_ID AS ledg_aca_id
+			 , LEDG_SEQ AS ledg_seq
+			 , FC_GET_CODE_NM('LEDG_CD', LEDG_CD) AS ledg_cd_nm
+			 , LEDG_CD AS ledg_cd
+			 , LEDG_NM AS ledg_nm
+			 , DATE_FORMAT(WRITE_DT, '%Y-%m-%d') AS write_dt
+			 , CASE WHEN USE_YN = 'Y' THEN '사용'
+					ELSE '미사용'
+					END AS ledg_use_yn_nm
+			 , USE_YN AS ledg_use_yn
+			 , LEDG_CONTS AS ledg_conts
+			 , WRITER_NM AS writer_nm
+			 , DATE_FORMAT(ENT_DTTM, '%Y-%m-%d') AS ledg_ent_dttm
+		     , ENT_USER_ID AS ledg_ent_user_id
+		     , DATE_FORMAT(UPT_DTTM, '%Y-%m-%d') AS ledg_upt_dttm
+		     , UPT_USER_ID AS ledg_upt_user_id
+		  FROM TB_ACA_LEDGER
+		 WHERE 1=1
+		   AND ACA_ID = #{aca_id}
+		<if test="ledg_cd_srch != ''">
+	 	   AND LEDG_CD = #{ledg_cd_srch}
+	 	</if>
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select>
+
+	<select id="getCounselListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CenterMngMapper.getCounselListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   ACA_ID as cncl_aca_id
+			 , SEQ as cncl_seq
+		     , DATE_FORMAT(CNCL_DT, '%Y-%m-%d') AS cncl_dt
+		     , FC_GET_CODE_NM('CNCL_TP', CNCL_TP) AS cncl_tp_nm
+		     , CNCL_TP AS cncl_tp
+		     , CUST_NM AS cust_nm
+		     , CUST_TEL_NO AS cust_tel_no
+		     , CNCL_CONTS AS cncl_conts
+		     , DATE_FORMAT(ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS cncl_ent_dttm
+		     , ENT_USER_ID AS cncl_ent_user_id
+		  FROM TB_ACA_CNCL
+		 WHERE 1=1
+		   AND ACA_ID = #{aca_id}
+		 <choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select>
+	
+	<select id="getAcaAllianceAcaList" parameterType="hashMap" resultType="hashMap">
+	/* CenterMngMapper.getAcaAllianceAcaList */
+		SELECT 
+			SQL_CALC_FOUND_ROWS
+			A.ACA_ID AS aca_id
+			, A.ALLIAN_ACA_ID AS allian_aca_id
+			, B.ACA_NM AS aca_nm
+			, FC_GET_CODE_NM('ACA_TP', B.ACA_TP) AS aca_tp
+			, B.BOSS_ID AS boss_id
+			, B.BOSS_NM AS boss_nm
+			, B.BIZ_NO AS biz_no
+			, B.TEL_NO AS tel_no
+			, A.USE_YN AS use_yn
+			, IFNULL(A.ENT_USER_ID, A.UPT_USER_ID) AS upt_user_id
+			, IFNULL(DATE_FORMAT(A.ENT_DTTM, '%Y-%m-%d %h:%i:%s'), DATE_FORMAT(A.UPT_DTTM, '%Y-%m-%d %h:%i:%s')) AS upt_dttm
+		FROM
+			TB_ACA_ALLIAN AS A
+		JOIN 
+			TB_ACA AS B ON A.ALLIAN_ACA_ID = B.ACA_ID 
+		WHERE
+			A.ACA_ID = #{alliance_aca_id}
+		LIMIT ${start}, ${end}	
+	</select>
+	
+	<select id="getAcaSrchList" parameterType="hashMap" resultType="hashMap">
+	/* CenterMngMapper.getAcaSrchList */
+		SELECT
+			ACA_ID AS id
+			, ACA_NM AS text
+		FROM
+			TB_ACA
+		WHERE 
+			1=1
+			AND ACA_ID != 'AC00001'
+			<if test='srch_aca !=null and srch_aca!="" '>
+			AND ACA_NM LIKE CONCAT('%', #{srch_aca}, '%')
+			</if>		
+	</select>
+	
+	<insert id="allianceInfoCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.allianceInfoCreate */
+		INSERT
+			INTO TB_ACA_ALLIAN
+			(
+				ACA_ID
+				, ALLIAN_ACA_ID
+				, USE_YN
+				, ENT_USER_ID
+				, ENT_DTTM			 			 
+			)
+			SELECT
+				#{alliance_aca_id}
+				, #{alliance_aca}
+				, #{alliance_use_yn}
+				, #{upt_user_id}
+				, NOW()
+			FROM DUAL
+			ON DUPLICATE KEY UPDATE
+				USE_YN = #{alliance_use_yn}
+				, UPT_USER_ID = #{upt_user_id}
+				, UPT_DTTM = NOW()
+	</insert>
+	
+	<insert id="allianceMatchingInfoCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.allianceMatchingInfoCreate */
+		INSERT
+			INTO TB_ACA_ALLIAN
+			(
+				ACA_ID
+				, ALLIAN_ACA_ID
+				, USE_YN
+				, ENT_USER_ID
+				, ENT_DTTM			 			 
+			)
+			SELECT
+				#{alliance_aca}
+				, #{alliance_aca_id}				
+				, #{alliance_use_yn}
+				, #{upt_user_id}
+				, NOW()
+			FROM DUAL
+			ON DUPLICATE KEY UPDATE
+				USE_YN = #{alliance_use_yn}
+				, UPT_USER_ID = #{upt_user_id}
+				, UPT_DTTM = NOW()	
+	</insert>
+
+	<select id="getPrizeListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CenterMngMapper.getPrizeListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   ACA_ID as prize_aca_id
+    		 , FC_GET_CODE_NM('PRIZE_GB', PRIZE_GB) AS prize_gb_nm
+	         , PRIZE_GB AS prize_gb
+	         , CASE WHEN PRIZE_GB = 'M' THEN CONCAT(CONCAT(CONCAT(SUBSTR(YYYYMM,1,4),'년 '),SUBSTR(YYYYMM,5,2)),'월')
+	         		WHEN PRIZE_GB = 'W' THEN CONCAT(CONCAT(CONCAT(CONCAT(SUBSTR(YYYYMM,1,4),'년 '),SUBSTR(YYYYMM,5,2)),'월'),WEEK)
+	         		ELSE '' END AS prize_period
+		     , PRIZE_REASON AS prize_reason
+		     , BENEFIT AS prize_benefit
+		     , YYYYMM AS yyyymm
+		     , SUBSTR(YYYYMM,1,4) AS prize_yyyy
+		     , SUBSTR(YYYYMM,5,2) AS prize_mm
+		     , WEEK AS week
+		     , USE_YN AS prize_use_yn
+		  FROM TB_ACA_PRIZE
+		 WHERE 1=1
+		   AND ACA_ID = #{aca_id}
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select>
+
+	<select id="getQueryTotalCnt" resultType="int">
+	/* CenterMngMapper.getQueryTotalCnt */
+		SELECT FOUND_ROWS()
+	</select>
+
+	<select id="getNewAcaID" resultType="string">
+	/* CenterMngMapper.getNewAcaID */
+		SELECT CONCAT("HL",LPAD(IFNULL(MAX(SUBSTR(ACA_ID,4,7)), 0) + 1,5,0)) AS aca_id
+		  FROM TB_ACA
+		 WHERE ACA_ID LIKE CONCAT('HL0','%')
+	</select>
+
+	<select id="getPosListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CenterMngMapper.getPosListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   TPI.CORP_CD as pos_corp_cd
+			 , TPI.SEQ as pos_seq
+			 , TPI.POS_TP as pos_tp
+			 , (SELECT CODE_NM
+			 	FROM TB_CODE
+			 	WHERE CODE = TPI.POS_TP
+			 	AND CODE_GRP_CD = 'POS_TP') as pos_tp_nm
+			 , TPI.POS_NM as pos_nm
+			 , TPI.SERIAL_NO as pos_serial_no
+			 , TPI.VAN_CD as pos_van_cd
+			 , TPI.CAT_ID as pos_cat_id
+			 , TPI.MEMB_STORE_ID as pos_memb_store_id
+			 , TPI.POS_STATUS as pos_use_yn
+			 , CASE TPI.POS_STATUS WHEN 'Y' THEN '사용'
+							   WHEN 'N' THEN '미사용'
+							   ELSE NULL END        as pos_use_yn_nm
+			 , TPI.ENT_USER_ID as pos_ent_user_id
+			 , DATE_FORMAT(TPI.ENT_DTTM, '%Y-%m-%d %H:%i:%s') as pos_ent_dttm
+		FROM TB_POS_INFO TPI
+		WHERE
+			TPI.CORP_CD = #{aca_id}
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+		LIMIT ${start}, ${end}
+	</select>
+	
+	<select id="getCenterCourseCnt" parameterType="hashMap" resultType="int">
+	/* CenterMngMapper.getCenterCourseCnt */
+		SELECT
+			COUNT(1)
+	    FROM
+	    	TB_CURRI_MST 
+	 	WHERE
+	 		ACA_ID = #{aca_id}
+	</select>
+	
+	<insert id="centerCodeCopy" parameterType="hashMap">
+	/* CenterMngMapper.centerCodeCopy */
+		INSERT
+			INTO TB_ACA_CODE (
+							  ACA_ID
+							, CODE_GRP_CD
+							, CODE
+							, CODE_NM
+							, RMKS
+							, ORD_NO
+							, CHK_CD1
+							, CHK_CD2
+							, VIEW_YN
+							, USE_YN
+							, ENT_DTTM
+							, ENT_USER_ID
+							)
+						SELECT
+							 #{aca_id} AS ACA_ID
+							, CODE_GRP_CD
+							, CODE
+							, CODE_NM
+							, RMKS
+							, ORD_NO
+							, CHK_CD1
+							, CHK_CD2
+							, VIEW_YN
+							, USE_YN
+							, ENT_DTTM
+							, ENT_USER_ID
+					    FROM
+					    	TB_CODE TC
+						WHERE
+							CODE_GRP_CD = 'SUBJECT_CD'
+						AND
+							CODE != 'CODE'
+			 ON DUPLICATE KEY UPDATE
+		      CODE_NM = TC.CODE_NM 
+			, RMKS = TC.RMKS
+	        , ORD_NO  = TC.ORD_NO
+	        , CHK_CD1 = TC.CHK_CD1
+	        , CHK_CD2 = TC.CHK_CD2
+	        , VIEW_YN = TC.VIEW_YN
+	        , UPT_DTTM = NOW()
+	        , UPT_USER_ID = #{user_id}
+	</insert>
+	
+	<insert id="centerLvlCopy" parameterType="hashMap">
+	/* CenterMngMapper.centerLvlCopy */
+		INSERT
+			INTO TB_ACA_LVL_INFO(
+								  ACA_ID
+								, LVL_CD
+								, SUBJECT_CD
+								, LVL_NM
+								, P_LVL_CD
+								, LVL_DEPTH
+								, ORD_NO
+								, USE_YN
+								, ENT_DTTM
+								, ENT_USER_ID
+								)
+							SELECT 
+								  #{aca_id} AS ACA_ID
+								, LVL_CD
+								, SUBJECT_CD
+								, LVL_NM
+								, P_LVL_CD
+								, LVL_DEPTH
+								, ORD_NO
+								, USE_YN
+								, ENT_DTTM
+								, ENT_USER_ID
+							FROM
+								TB_ACA_LVL_INFO TAL
+							WHERE
+								ACA_ID = #{p_aca_id}
+			ON DUPLICATE KEY UPDATE
+		      LVL_NM = TAL.LVL_NM 
+			, USE_YN = TAL.USE_YN
+	        , UPT_DTTM = NOW()
+	        , UPT_USER_ID = #{user_id}
+	</insert>
+	
+	<insert id="centerCourseCopy" parameterType="hashMap">
+	/* CenterMngMapper.centerCourseCopy */
+		INSERT
+			INTO TB_CURRI_MST(
+							  CURRI_CD
+							, ACA_ID
+							, CURRI_NM
+							, SUBJECT_CD
+							, CURRI_CONTS
+							, LVL_CD
+							, LVL_DEP_1
+							, LVL_DEP_2
+							, LVL_DEP_3
+							, CURRI_AMT
+							, CLASS_PERIOD_TYPE
+							, CLASS_PERIOD_VAL
+							, USE_YN
+							, ENT_DTTM
+							, ENT_USER_ID
+							)   
+						SELECT 
+							  FN_GET_JOB_SEQ('TB_CURRI_MST') AS CURRI_CD
+					        , #{aca_id} AS ACA_ID
+					        , CURRI_NM
+					        , SUBJECT_CD
+					        , CURRI_CONTS
+					        , LVL_CD
+					        , LVL_DEP_1
+					        , LVL_DEP_2
+					        , LVL_DEP_3
+					        , CURRI_AMT
+					        , CLASS_PERIOD_TYPE
+					        , CLASS_PERIOD_VAL
+					        , USE_YN
+					        , ENT_DTTM
+					        , ENT_USER_ID
+					 	FROM
+					 		TB_CURRI_MST
+						WHERE
+							ACA_ID = #{p_aca_id}
+	</insert>
+
+	<insert id="centerInfoCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.centerInfoCreate */
+		INSERT
+		  INTO TB_ACA (	ACA_ID
+				      , ACA_NM
+				      , ACA_TP
+				      , SALES_GRADE
+				      , P_ACA_ID
+				      , BOSS_ID
+				      , BOSS_NM
+				      , JISA_CD
+				      , BIZ_NO
+				      , TEL_NO
+				      , FAX_NO
+				      , EMAIL
+				      , ADDR
+				      , ADDR_DTL
+				      , ZIP_NO
+				      , OPEN_TM
+				      , CLOSE_TM
+				      , HOMPAGE
+				      , PCODE_USE_YN
+				      , CONT_STAT
+				      , USE_YN
+				      , ENT_DTTM
+				      , ENT_USER_ID
+				      , UPT_DTTM
+				      , UPT_USER_ID
+				      , BIZ_NM
+					  , MIG_A_CODE
+					  , MIG_HOME_CODE
+		  			  )
+		  		SELECT  #{aca_id}
+		  			  , #{aca_nm}
+				      , #{aca_tp}
+				      , #{sales_grade}
+				      , #{p_aca_id}
+				      , #{boss_id}
+				      , #{boss_nm}
+				      , #{jisa_cd}
+				      , #{biz_no}
+				      , #{tel_no}
+				      , #{fax_no}
+				      , #{email}
+				      , #{addr}
+				      , #{addr_dtl}
+				      , #{zip_no}
+				      , #{open_tm}
+				      , #{close_tm}
+				      , #{hompage}
+				      , 'Y'
+				      , #{cont_stat}
+				      , #{use_yn}
+				      , NOW()
+				      , #{ent_user_id}
+				      , NOW()
+		        	  , #{upt_user_id}
+		        	  , #{biz_nm}
+					  , #{mig_a_code}
+					  , #{mig_home_code}
+		           FROM DUAL
+	</insert>
+
+	<insert id="bossUserCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.bossUserCreate */
+		INSERT
+		  INTO TB_USER ( USER_ID
+				       , ACA_ID
+				       , USER_PWD
+				       , USER_NM
+				       , USER_GB_CD
+				       , AUTH_GRP_CD
+				       , HP_NO
+				       , USE_YN
+				       , ENT_DTTM
+				       , ENT_USER_ID
+				       , UPT_DTTM
+				       , UPT_USER_ID
+		  			   )
+		  	    SELECT #{boss_id}
+		  	    	  , #{aca_id}
+				      , PASSWORD(#{user_pwd})
+				      , #{boss_nm}
+				      , "01"
+				      , "AG0101"
+				      , #{hp_no}
+				      , #{use_yn}
+				      , NOW()
+				      , #{ent_user_id}
+				      , NOW()
+		        	  , #{upt_user_id}
+		           FROM DUAL
+	</insert>
+
+	<insert id="acaSalesCorpCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.acaSalesCorpCreate */
+		INSERT
+		  INTO TB_ACA_SALES_CORP ( ACA_ID
+						     	 , CORP_CD
+							     , USE_YN
+					      	 	 , ENT_DTTM
+					      		 , ENT_USER_ID
+				  			  	 )
+						  	    SELECT #{aca_id}
+						  	    	  , #{corp_cd}
+						  	    	  , 'Y'
+								      , NOW()
+								      , #{ent_user_id}
+				           		FROM DUAL
+	</insert>
+
+	<insert id="salesCorpCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.salesCorpCreate */
+		INSERT
+		  INTO TB_SALES_CORP ( CORP_CD
+						     , CORP_NM
+						     , CORP_TP
+						     , MAIN_ACA_ID
+						     , BIZ_NO
+						     , TEL_NO
+						     , FAX_NO
+						     , ZIP_NO
+						     , ADDR
+						     , ADDR_DTL
+							 , USE_YN
+				      	 	 , ENT_DTTM
+				      		 , ENT_USER_ID
+				      		 , UPT_DTTM
+				      		 , UPT_USER_ID
+				  			  )
+				  	    SELECT #{aca_id}
+				  	    	  , #{aca_nm}
+				  	    	  , '01'
+				  	    	  , #{p_aca_id}
+						      , #{biz_no}
+						      , #{tel_no}
+						      , #{fax_no}
+						      , #{zip_no}
+						      , #{addr}
+						      , #{addr_dtl}
+						      , #{use_yn}
+						      , NOW()
+						      , #{ent_user_id}
+						      , NOW()
+				        	  , #{upt_user_id}
+				           FROM DUAL
+	</insert>
+
+	<insert id="empUserCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.empUserCreate */
+		INSERT
+		  INTO TB_EMP ( EMP_ID
+				      , EMP_TP
+				      , ENT_DTTM
+				      , ENT_USER_ID
+				      , UPT_DTTM
+				      , UPT_USER_ID
+		  			  )
+		  	    SELECT #{boss_id}
+		  	    	  , "02"
+				      , NOW()
+				      , #{ent_user_id}
+				      , NOW()
+		        	  , #{upt_user_id}
+		           FROM DUAL
+	</insert>
+
+	<insert id="empAuthCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.empAuthCreate */
+		INSERT
+		  INTO TB_USER_TP_AUTH_GRP ( USER_ID
+							       , AUTH_GRP_CD
+							       , STR_DTTM
+							       , END_DTTM
+							       , ENT_DTTM
+							       , ENT_USER_ID
+							       , UPT_DTTM
+							       , UPT_USER_ID
+					  			   )
+					  	    SELECT #{boss_id}
+					  	    	  , "AG0101"
+					  	    	  , NOW()
+					  	    	  , DATE_ADD(DATE_ADD(NOW(), INTERVAL +1 YEAR), INTERVAL -1 DAY)
+							      , NOW()
+							      , #{ent_user_id}
+							      , NOW()
+					        	  , #{upt_user_id}
+					           FROM DUAL
+	</insert>
+
+	<update id="centerInfoUpdate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.centerInfoUpdate */
+		UPDATE TB_ACA
+		   SET ACA_NM = #{aca_nm}
+		     , ACA_TP = #{aca_tp}
+		     , SALES_GRADE = #{sales_grade}
+		     , BOSS_ID = #{boss_id}
+		     , BOSS_NM = #{boss_nm}
+		     , JISA_CD = #{jisa_cd}
+		     , BIZ_NO = #{biz_no}
+		     , TEL_NO = #{tel_no}
+		     , FAX_NO = #{fax_no}
+		     , EMAIL = #{email}
+		     , ADDR = #{addr}
+		     , ADDR_DTL = #{addr_dtl}
+		     , ZIP_NO = #{zip_no}
+		     , OPEN_TM = #{open_tm}
+		     , CLOSE_TM = #{close_tm}
+		     , HOMPAGE = #{hompage}
+		     , PCODE_USE_YN = 'Y'
+		     , CONT_STAT = #{cont_stat}
+		     , USE_YN = #{use_yn}
+		     , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		     , BIZ_NM = #{biz_nm}
+			 , MIG_A_CODE = #{mig_a_code}
+			 , MIG_HOME_CODE = #{mig_home_code}
+		WHERE ACA_ID = #{aca_id}
+	</update>
+
+	<update id="bossUserUpdate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.bossUserUpdate */
+		UPDATE TB_USER
+		   SET USER_NM = #{boss_nm}
+		   	 , HP_NO = #{hp_no}
+		   	 , USE_YN = #{use_yn}
+		   	 , UPT_DTTM = NOW()
+		   	 , UPT_USER_ID = #{upt_user_id}
+		 WHERE USER_ID = #{boss_id}
+	</update>
+
+	<update id="salesCorpUpdate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.salesCorpUpdate */
+		UPDATE TB_SALES_CORP
+		   SET CORP_NM = #{aca_nm}
+		     , BIZ_NO = #{biz_no}
+		     , TEL_NO = #{tel_no}
+		     , FAX_NO = #{fax_no}
+		     , ZIP_NO = #{zip_no}
+		     , ADDR = #{addr}
+		     , ADDR_DTL = #{addr_dtl}
+		     , USE_YN = #{use_yn}
+		     , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		WHERE CORP_CD = #{aca_id}
+	</update>
+
+	<insert id="ledgerInfoCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.ledgerInfoCreate */
+		INSERT
+		  INTO TB_ACA_LEDGER ( ACA_ID
+					         , LEDG_SEQ
+					         , LEDG_CD
+					         , LEDG_NM
+					         , LEDG_CONTS
+					         , WRITER_NM
+					         , WRITE_DT
+					         , USE_YN
+					         , ENT_DTTM
+					         , ENT_USER_ID
+					         , UPT_DTTM
+					         , UPT_USER_ID
+			  			     )
+		 			 VALUES ( #{ledg_aca_id}
+					       , FN_GET_JOB_SEQ('TB_ACA_LEDGER')
+					       , #{ledg_cd}
+					       , #{ledg_nm}
+					       , #{ledg_conts}
+					       , #{writer_nm}
+					       , #{write_dt}
+					       , #{ledg_use_yn}
+					       , NOW()
+					       , #{ent_user_id}
+					       , NOW()
+			        	   , #{upt_user_id}
+			        	   )
+	</insert>
+
+	<update id="ledgerInfoUpdate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.ledgerInfoUpdate */
+		UPDATE TB_ACA_LEDGER
+		   SET LEDG_CD = #{ledg_cd}
+		     , LEDG_NM = #{ledg_nm}
+		     , LEDG_CONTS = #{ledg_conts}
+		     , WRITER_NM = #{writer_nm}
+		     , WRITE_DT = #{write_dt}
+		     , USE_YN = #{ledg_use_yn}
+		     , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		WHERE ACA_ID = #{ledg_aca_id}
+		  AND LEDG_SEQ = #{ledg_seq}
+	</update>
+
+	<insert id="contractInfoCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.contractInfoCreate */
+		INSERT
+		  INTO TB_ACA_CONT ( ACA_ID
+					       , SEQ
+					       , CONT_GB
+					       , CONT_USR_NM
+					       , CONT_TEL_NO
+					       , CONT_AMT
+					       , CONT_DT
+					       , STR_DT
+					       , END_DT
+					       , PAY_WAY
+					       , PAY_YN
+					       , PAY_DT
+					       , ENT_DTTM
+					       , ENT_USER_ID
+					       , UPT_DTTM
+					       , UPT_USER_ID
+			  			   )
+		 			 VALUES( #{cont_aca_id}
+					       , (SELECT IFNULL(MAX(A.SEQ), 0) + 1 FROM TB_ACA_CONT A WHERE A.ACA_ID = #{cont_aca_id})
+					       , #{cont_gb}
+					       , #{cont_usr_nm}
+					       , #{cont_tel_no}
+					       , #{cont_amt}
+					       , #{cont_dt}
+					       , #{str_dt}
+					       , #{end_dt}
+					       , #{pay_way}
+					       , #{pay_yn}
+					       , #{pay_dt}
+					       , NOW()
+					       , #{ent_user_id}
+					       , NOW()
+			        	   , #{upt_user_id}
+			        	   )
+	</insert>
+
+	<update id="contractInfoUpdate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.contractInfoUpdate */
+		UPDATE TB_ACA_CONT
+		   SET CONT_GB = #{cont_gb}
+		     , CONT_USR_NM = #{cont_usr_nm}
+		     , CONT_TEL_NO = #{cont_tel_no}
+		     , CONT_AMT = #{cont_amt}
+		     , CONT_DT = #{cont_dt}
+		     , STR_DT = #{str_dt}
+		     , END_DT = #{end_dt}
+		     , PAY_WAY = #{pay_way}
+		     , PAY_YN = #{pay_yn}
+		     , PAY_DT = #{pay_dt}
+		     , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		WHERE ACA_ID = #{cont_aca_id}
+		  AND SEQ = #{cont_seq}
+	</update>
+
+	<insert id="counselInfoCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.counselInfoCreate */
+		INSERT
+		  INTO TB_ACA_CNCL ( ACA_ID
+					       , SEQ
+					       , CNCL_TP
+					       , CNCL_DT
+					       , CUST_NM
+					       , CUST_TEL_NO
+					       , CUST_POS
+					       , CNCL_CONTS
+					       , ENT_DTTM
+					       , ENT_USER_ID
+			  			   )
+		 			 VALUES( #{cncl_aca_id}
+					       , (SELECT IFNULL(MAX(A.SEQ), 0) + 1 FROM TB_ACA_CNCL A WHERE A.ACA_ID = #{cncl_aca_id})
+					       , #{cncl_tp}
+					       , #{cncl_dt}
+					       , #{cust_nm}
+					       , #{cust_tel_no}
+					       , #{cust_pos}
+					       , #{cncl_conts}
+					       , NOW()
+					       , #{ent_user_id}
+					       )
+	</insert>
+
+	<update id="counselInfoUpdate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.counselInfoUpdate */
+		UPDATE TB_ACA_CNCL
+		   SET CNCL_TP = #{cncl_tp}
+		     , CNCL_DT = #{cncl_dt}
+		     , CUST_NM = #{cust_nm}
+		     , CUST_TEL_NO = #{cust_tel_no}
+		     , CUST_POS = #{cust_pos}
+		     , CNCL_CONTS = #{cncl_conts}
+		     , ENT_DTTM = NOW()
+		     , ENT_USER_ID = #{upt_user_id}
+		WHERE ACA_ID = #{cncl_aca_id}
+		  AND SEQ = #{cncl_seq}
+	</update>
+
+	<insert id="prizeInfoCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.prizeInfoCreate */
+		INSERT
+		  INTO TB_ACA_PRIZE ( PRIZE_GB
+					        , YYYYMM
+					        , WEEK
+					        , ACA_ID
+					        , STR_DT
+					        , END_DT
+					        , PRIZE_REASON
+					        , BENEFIT
+					        , USE_YN
+					        , ENT_DTTM
+					        , ENT_USER_ID
+					        , UPT_DTTM
+					        , UPT_USER_ID
+			  			    )
+		 			 VALUES( #{prize_gb}
+					       , CONCAT(#{prize_yyyy},#{prize_mm})
+					       , #{week}
+					       , #{prize_aca_id}
+					       , #{str_dt}
+					       , #{end_dt}
+					       , #{prize_reason}
+					       , #{prize_benefit}
+					       , #{prize_use_yn}
+					       , NOW()
+					       , #{ent_user_id}
+					       , NOW()
+					       , #{upt_user_id}
+					       )
+	</insert>
+
+	<update id="prizeInfoUpdate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.prizeInfoUpdate */
+		UPDATE TB_ACA_PRIZE
+		   SET ACA_ID = #{prize_aca_id}
+		     , STR_DT = #{str_dt}
+		     , END_DT = #{end_dt}
+		     , PRIZE_REASON = #{prize_reason}
+		     , BENEFIT = #{prize_benefit}
+		     , USE_YN = #{prize_use_yn}
+		     , ENT_DTTM = NOW()
+		     , ENT_USER_ID = #{upt_user_id}
+		WHERE PRIZE_GB = #{prize_gb}
+		  AND YYYYMM = CONCAT(#{prize_yyyy},#{prize_mm})
+		  AND WEEK = #{week}
+	</update>
+
+	<insert id="posCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.posCreate */
+		INSERT INTO TB_POS_INFO
+		(
+			CORP_CD
+		  	, SEQ
+		  	, POS_TP
+		  	, POS_NM
+		  	, SERIAL_NO
+		  	, VAN_CD
+		  	, CAT_ID
+		  	, MEMB_STORE_ID
+		  	, POS_STATUS
+		  	, ENT_USER_ID
+		  	, ENT_DTTM
+		 )
+		 VALUES(
+		 	#{aca_id}
+		 	, (SELECT IFNULL(MAX(A.SEQ), 0) + 1
+		 	   FROM TB_POS_INFO A
+		 	   WHERE A.CORP_CD = #{aca_id})
+		 	, #{pos_tp}
+		 	, #{pos_nm}
+		 	, #{pos_serial_no}
+		 	, #{pos_van_cd}
+		 	, #{pos_cat_id}
+		 	, #{pos_memb_store_id}
+		 	, #{pos_use_yn}
+		 	, #{pos_ent_user_id}
+		 	, NOW()
+		 )
+	</insert>
+
+	<update id="posUpdate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.posUpdate */
+		UPDATE TB_POS_INFO
+		SET	POS_TP = #{pos_tp}
+			, POS_NM = #{pos_nm}
+			, SERIAL_NO = #{pos_serial_no}
+		  	, VAN_CD = #{pos_van_cd}
+		  	, CAT_ID = #{pos_cat_id}
+		  	, MEMB_STORE_ID = #{pos_memb_store_id}
+		  	, POS_STATUS = #{pos_use_yn}
+		  	, UPT_DTTM = NOW()
+		  	, UPT_USER_ID = #{pos_upt_user_id}
+		WHERE CORP_CD = #{pos_corp_cd}
+		AND SEQ = #{pos_seq}
+	</update>
+
+	<update id="pgInfoCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.pgInfoCreate */
+		UPDATE TB_SALES_CORP
+		   SET PG_STORE_ID = #{pg_store_id}
+			 , PG_USER_ID = #{pg_user_id}
+			 , CRYPTO_KEY = #{pg_crypto_key}
+			 , PAY_RATE = #{pg_pay_rate}
+			 , PAY_DAY = #{pg_pay_day}
+			 , AUTH_YN = #{auth_yn}
+		  	 , UPT_DTTM = NOW()
+		  	 , UPT_USER_ID = #{pg_upt_user_id}
+		 WHERE CORP_CD = #{aca_id}
+	</update>
+
+	<update id="smsAuthInfoUpdate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.smsAuthInfoUpdate */
+		UPDATE TB_ACA
+		   SET SMS_AUTH_CODE = #{pg_sms_auth_code}
+			 , UPT_DTTM = NOW()
+		  	 , UPT_USER_ID = #{upt_user_id}
+		 WHERE ACA_ID = #{aca_id}
+	</update>
+
+	<insert id="corpGoodsCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.corpGoodsCreate */
+		INSERT INTO TB_CORP_GOODS
+        		( CORP_CD
+        		, GOODS_CD
+        		, GOODS_TP
+        		, GOODS_UNIT_TP
+        		, GOODS_UNIT_VALUE
+        		, GOODS_NM
+        		, TAX_TP
+        		, PRICE
+        		, VAT
+        		, TOT_AMT
+        		, GOODS_MEMO
+        		, SET_ITEM_CHK
+        		, GOODS_PAY_DIV_CHK
+        		, GOODS_PAY_CALC_TP
+        		, GOODS_PAY_CALC_VAL
+        		, USE_YN
+        		, ENT_DTTM
+        		, ENT_USER_ID)
+		  SELECT #{aca_id} AS CORP_CD
+			    , GOODS_CD
+			    , GOODS_TP
+			    , GOODS_UNIT_TP
+			    , GOODS_UNIT_VALUE
+			    , GOODS_NM
+			    , TAX_TP
+        		, PRICE
+        		, VAT
+        		, TOT_AMT
+        		, GOODS_MEMO
+        		, SET_ITEM_CHK
+        		, GOODS_PAY_DIV_CHK
+        		, GOODS_PAY_CALC_TP
+        		, GOODS_PAY_CALC_VAL
+        		, T1.USE_YN
+        		, NOW()
+        		, 'AC00001' as ENT_USER_ID
+  			 FROM TB_CORP_GOODS T1
+ 			WHERE T1.GOODS_PAY_DIV_CHK = "Y"
+   			  AND T1.CORP_CD = 'AC00001'
+	</insert>
+
+	<insert id="centerLogCreate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+		INSERT INTO TB_ACA_LOG
+		(
+			SEQ
+			, ACA_ID
+			, ACA_NM
+			, ACA_TP
+			, P_ACA_ID
+			, BOSS_ID
+			, BOSS_NM
+			, JISA_CD
+			, BIZ_NO
+			, TEL_NO
+			, FAX_NO
+			, EMAIL
+			, ZIP_NO
+			, ADDR
+			, ADDR_DTL
+			, OPEN_TM
+			, CLOSE_TM
+			, HOMPAGE
+			, CONT_STAT
+			, USE_YN
+			, LIC_AMT_MON
+			, LIC_AMT_STD
+			, UPT_DTTM
+			, UPT_USER_ID
+		)
+		SELECT (SELECT IFNULL(MAX(A.SEQ), 0) + 1
+			    FROM TB_ACA_LOG A
+			    WHERE A.ACA_ID = #{aca_id})
+			 , ACA_ID
+			 , ACA_NM
+			 , ACA_TP
+			 , P_ACA_ID
+			 , BOSS_ID
+			 , BOSS_NM
+			 , JISA_CD
+			 , BIZ_NO
+			 , TEL_NO
+			 , FAX_NO
+			 , EMAIL
+			 , ZIP_NO
+			 , ADDR
+			 , ADDR_DTL
+			 , OPEN_TM
+			 , CLOSE_TM
+			 , HOMPAGE
+			 , CONT_STAT
+			 , USE_YN
+			 , LIC_AMT_MON
+			 , LIC_AMT_STD
+			 , NOW()
+			 , #{upt_user_id}
+		FROM TB_ACA
+		WHERE ACA_ID = #{aca_id}
+	</insert>
+
+	<insert id="ledgerDataFileCreate" parameterType="com.web.kdebate.common.common.domain.FileVo">
+	/* CenterMngMapper.ledgerDataFileCreate */
+		INSERT
+		  INTO TB_ACA_LEDG_APND_FILE ( LEDG_SEQ
+						             , FILE_NM
+						       	     , FILE_PATH
+						             , FILE_URL
+						             , ORIGIN_FILE_NM
+						             , FILE_SIZE
+				  			         )
+				  		      SELECT #{bbs_seq}
+						           , #{file_nm}
+						           , #{file_path}
+						           , #{save_path}
+						           , #{original_nm}
+						           , #{file_size}
+				               FROM DUAL
+	</insert>
+
+	<select id="getLedgerMultiFileList" parameterType="hashMap" resultType="hashMap">
+	/* CenterMngMapper.getLedgerMultiFileList */
+		SELECT ORIGIN_FILE_NM AS "original_nm"
+			 , FILE_SIZE AS "img_size"
+			 , FILE_URL AS "img_url"
+  		  FROM TB_ACA_LEDG_APND_FILE
+ 		 WHERE LEDG_SEQ = #{ledg_seq}
+	</select>
+
+	<delete id="ledgerDataFileDelete" parameterType="com.web.kdebate.common.common.domain.FileVo">
+	/* CenterMngMapper.ledgerDataFileDelete */
+		DELETE FROM TB_ACA_LEDG_APND_FILE
+		 WHERE FILE_URL = #{img_url}
+	</delete>
+
+	<select id="getLedgerDataFileList" parameterType="hashMap" resultType="hashMap">
+	/* CenterMngMapper.getLedgerDataFileList */
+ 		SELECT FILE_SEQ AS file_seq
+		     , ORIGIN_FILE_NM AS origin_file_nm
+		     , FILE_URL AS file_url
+		  FROM TB_ACA_LEDG_APND_FILE
+ 	 	WHERE 1=1
+ 	 	  AND LEDG_SEQ = #{ledg_seq}
+ 	 	 ORDER BY FILE_SEQ
+	</select>
+
+	<update id="optionInfoUpdate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.optionInfoUpdate */
+		UPDATE TB_ACA
+		   SET LOGO_USE_YN = #{logo_use_yn}
+			 , LOGO_IMG_PATH = #{logo_img_path}
+			 , LOGO_FILE_NM	= #{logo_file_nm}
+			 , PCODE_USE_YN = #{pcode_use_yn}
+			 , LEVEL_USE_YN = #{level_use_yn}
+			 , CURRI_USE_YN = #{curri_use_yn}
+			 , CLASS_PERIOD_TYPE = #{class_period_type}
+			 , INVOICE_ISSUE_AUTO_YN = #{invoice_issue_auto}
+			 , INVOICE_ISSUE_TYPE = #{invoice_isssue_type}
+			 , INVOICE_ISSUE_DAY = #{invoice_issue_day}
+		  	 , FILE_LIMIT = #{file_limit}
+		  	 , HOMEPAGE_USE_YN = #{homepage_use_yn}
+		  	 , HOMEPAGE_URL = #{homepage_url}
+		  	 , EXAM_SYS_USE_YN = #{exam_sys_use_yn}
+		  	 , RATING_SYS_USE_YN = #{rating_sys_use_yn}
+		  	 , UPT_USER_ID = #{upt_user_id}
+		  	 , UPT_DTTM = NOW()
+		 WHERE ACA_ID = #{option_aca_id}
+	</update>
+
+	<update id="licInfoUpdate" parameterType="com.web.kdebate.center.center.domain.CenterMngVo">
+	/* CenterMngMapper.licInfoUpdate */
+		UPDATE TB_ACA
+		   SET LIC_AMT_MON = #{lic_amt_mon}
+			 , LIC_AMT_STD = #{lic_amt_std}
+			 , LIC_CONT_TP = #{lic_cont_tp}
+			 , SMS_PREPAY_YN = #{sms_prepay_yn}
+			 , SMS_PRICE = #{sms_price}
+			 , LMS_PRICE = #{lms_price}
+			 , MMS_PRICE = #{mms_price}
+			 , RCS_PRICE = #{rcs_price}
+			 , KATALK_PRICE = #{katalk_price}
+		  	 , UPT_DTTM = NOW()
+		  	 , UPT_USER_ID = #{upt_user_id}
+		 WHERE ACA_ID = #{aca_id}
+	</update>
+
+	<update id="acaSmsUidInfoUpdate" parameterType="hashMap">
+	/* CenterMngMapper.acaSmsUidInfoUpdate */
+		UPDATE TB_ACA
+	       SET SMS_UID = #{sms_uid}
+	       	 , UPT_USER_ID = #{upt_user_id}
+	       	 , UPT_DTTM = NOW()
+	     WHERE ACA_ID = #{aca_id}
+	</update>
+	<select id="getUserRetrieve" parameterType="hashMap" resultType="com.web.kdebate.common.common.domain.SessionVO">
+		SELECT T1.USER_ID AS user_id
+			 , T1.USER_NM AS user_nm
+			 , T1.UPT_USER_ID AS upt_user_id
+			 , T1.ENT_DTTM AS ent_dttm
+			 , T1.LST_CONN_DTTM AS lst_cnct_dttm
+			 , T1.UPT_DTTM AS upt_dttm
+			 , T1.USE_YN AS use_yn
+			 , T1.ACA_ID as aca_id
+			 , T2.ACA_NM as aca_nm
+			 , T2.ACA_ID AS corp_cd
+			 , T2.P_ACA_ID AS p_aca_id
+			 , T2.MIG_A_CODE AS mig_a_code
+			 , T2.BOSS_ID as boss_id
+			 , T2.PCODE_USE_YN as pcode_use_yn
+			 , T3.LOGO_USE_YN	as logo_use_yn
+			 , T3.LOGO_IMG_PATH as logo_img_path
+			 , T3.LEVEL_USE_YN as level_use_yn
+			 , T3.CURRI_USE_YN as curri_use_yn
+		  FROM TB_USER T1
+		  LEFT JOIN TB_ACA T2 ON T2.ACA_ID = T1.ACA_ID
+		  LEFT JOIN TB_ACA_OPTION T3 ON T3.ACA_ID = T2.ACA_ID
+		 WHERE T1.USER_ID = #{user_id}
+		   AND T1.USE_YN='Y'
+	</select>
+	<select id="getUserGrpRetrieve" parameterType="hashMap" resultType="string">
+	    SELECT B.AUTH_GRP_CD
+	      FROM TB_USER A INNER JOIN TB_USER_TP_AUTH_GRP B
+	      						 ON B.USER_ID = A.USER_ID
+			 			 INNER JOIN TB_AUTH_GRP_MENU C
+								 ON C.AUTH_GRP_CD = B.AUTH_GRP_CD
+								AND C.SITE_GB_CD = 'SG0001'
+	 	 WHERE A.USER_ID = #{user_id}
+		   AND A.USE_YN = 'Y'
+	  GROUP BY B.AUTH_GRP_CD
+	</select>
+	<select id="getMenuRetrieve" parameterType="com.web.kdebate.common.common.domain.SessionVO" resultType="java.util.HashMap">
+		SELECT X.top_menu_id     AS top_menu_id
+		     , X.top_menu_name   AS top_menu_name
+		     , X.top_menu_type   AS top_menu_type
+		     , X.top_menu_url    AS top_menu_url
+		     , TRIM(X.view_icon1)  AS view_icon1
+		     , TRIM(X.view_yn1)  AS view_yn1
+		     , X.menu_ord1       AS menu_ord1
+		     , X.left1_menu_id   AS left1_menu_id
+		     , X.left1_menu_name AS left1_menu_name
+		     , X.left1_menu_type AS left1_menu_type
+		     , X.left1_menu_url  AS left1_menu_url
+		     , TRIM(X.view_yn2)  AS view_yn2
+		     , TRIM(X.view_icon2)  AS view_icon2
+		     , X.menu_ord2       AS menu_ord2
+		     , X.ord_2 AS ord_2
+ 		  FROM (
+				SELECT A.MENU_CD top_menu_id
+				     , A.MENU_NM top_menu_name
+				     , A.MENU_TP top_menu_type
+				     , A.MENU_URL top_menu_url
+				     , A.VIEW_YN view_yn1
+				     , A.MENU_ORD menu_ord1
+				     , A.VIEW_ICON view_icon1
+				     , C.MENU_CD left1_menu_id
+				     , C.MENU_NM left1_menu_name
+				     , C.MENU_TP left1_menu_type
+				     , C.MENU_URL left1_menu_url
+				     , C.VIEW_YN view_yn2
+				     , C.MENU_ORD menu_ord2
+				     , C.VIEW_ICON view_icon2
+				     , B.MENU_ORD ord_2
+				  FROM TB_MENU A
+				  LEFT JOIN TB_MENU B ON B.MENU_PRNT_CD = A.MENU_CD AND B.MENU_TP IN ('D', 'P') AND B.SITE_GB_CD = 'SG0001' AND B.USE_YN = 'Y' AND EXISTS (SELECT 'X' FROM TB_AUTH_GRP_MENU WHERE MENU_CD = B.MENU_CD AND SITE_GB_CD = 'SG0001' AND AUTH_GRP_CD IN <foreach item="item" index="index" collection="user_group" open="(" separator="," close=")">#{item}</foreach> )
+				  LEFT JOIN TB_MENU C ON C.MENU_PRNT_CD = B.MENU_CD AND C.MENU_TP IN ('D', 'P') AND C.SITE_GB_CD = 'SG0001' AND C.USE_YN = 'Y' AND EXISTS (SELECT 'X' FROM TB_AUTH_GRP_MENU WHERE MENU_CD = C.MENU_CD AND SITE_GB_CD = 'SG0001' AND AUTH_GRP_CD IN <foreach item="item" index="index" collection="user_group" open="(" separator="," close=")">#{item}</foreach> )
+				 WHERE A.MENU_PRNT_CD = 'M'
+				   AND A.MENU_TP IN ('D', 'P')
+				   AND A.USE_YN = 'Y'
+				   AND A.SITE_GB_CD = 'SG0001'
+				   AND EXISTS (SELECT 'X' FROM TB_AUTH_GRP_MENU WHERE MENU_CD = A.MENU_CD AND SITE_GB_CD = 'SG0001' AND AUTH_GRP_CD IN <foreach item="item" index="index" collection="user_group" open="(" separator="," close=")">#{item}</foreach> )
+					ORDER BY A.MENU_ORD, B.MENU_ORD , C.MENU_ORD
+				   ) X
+		 ORDER BY X.menu_ord1,  X.ord_2 , X.menu_ord2
+	</select>
+</mapper>

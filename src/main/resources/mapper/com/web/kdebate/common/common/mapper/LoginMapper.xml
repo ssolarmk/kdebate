@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.web.kdebate.common.common.mapper.LoginMapper">
+    <select id="getUserRetrieve" parameterType="hashMap" resultType="com.web.kdebate.common.common.domain.SessionVO">
+		 SELECT T1.USER_ID AS user_id,
+		        T1.USER_NM AS user_nm,
+		        T1.UPT_USER_ID AS upt_user_id,
+		        T1.ENT_DTTM AS ent_dttm,
+		        T1.LST_CONN_DTTM AS lst_cnct_dttm,
+		        T1.UPT_DTTM AS upt_dttm,
+		        T1.USE_YN AS use_yn,
+		        T1.ACA_ID AS aca_id,
+		        T2.ACA_NM AS aca_nm,
+		        T2.ACA_ID AS corp_cd,
+		        T2.P_ACA_ID AS p_aca_id,
+		        T2.MIG_A_CODE AS mig_a_code,
+		        T2.HOMPAGE AS hompage,
+		        T1.USER_PWD AS user_pwd,
+		        T2.PCODE_USE_YN	AS pcode_use_yn,
+		        TE.EMP_TP AS emp_tp,
+                T4.LEVEL_USE_YN AS level_use_yn,
+                T4.CURRI_USE_YN AS curri_use_yn,
+                T2.SMS_UID AS sms_uid,
+                T4.LOGO_USE_YN AS logo_use_yn,
+                T4.LOGO_IMG_PATH AS logo_img_path,
+                T2.HOMEPAGE_URL AS homepage_url,
+                IFNULL(T2.RECEIPT_PRINT_TEXT, '') as receipt_print_text
+		   FROM TB_USER T1
+		   INNER JOIN TB_ACA T2
+		   	  ON T2.ACA_ID = T1.ACA_ID
+		      AND T2.USE_YN = 'Y'
+		      AND T2.CONT_STAT IN ('00', '01')
+		   LEFT JOIN TB_EMP TE ON TE.EMP_ID = T1.USER_ID   
+		   LEFT JOIN TB_ACA_OPTION T4
+				ON T4.ACA_ID = T1.ACA_ID
+		  WHERE T1.USER_ID = #{user_id}
+		    AND T1.USER_PWD = PASSWORD(#{user_pswd})
+		    AND T1.USE_YN = 'Y'
+		  UNION ALL
+		 SELECT T1.USER_ID AS user_id,
+		        T1.USER_NM AS user_nm,
+		        T1.UPT_USER_ID AS upt_user_id,
+		        T1.ENT_DTTM AS ent_dttm,
+		        T1.LST_CONN_DTTM AS lst_cnct_dttm,
+		        T1.UPT_DTTM AS upt_dttm,
+		        T1.USE_YN AS use_yn,
+		        T2.MAIN_ACA_ID AS aca_id,
+		        T3.ACA_NM AS aca_nm,
+		        T2.CORP_CD AS corp_cd,
+		        T3.P_ACA_ID AS p_aca_id,
+		        T3.MIG_A_CODE AS mig_a_code,
+		        T3.HOMPAGE AS hompage,
+		        T1.USER_PWD AS user_pwd,
+		        T3.PCODE_USE_YN	AS pcode_use_yn,
+		        TE.EMP_TP AS emp_tp,
+                T5.LEVEL_USE_YN AS level_use_yn,
+                T5.CURRI_USE_YN AS curri_use_yn,
+                T3.SMS_UID as sms_uid,
+                T5.LOGO_USE_YN AS logo_use_yn,
+                T5.LOGO_IMG_PATH AS logo_img_path,
+                T3.HOMEPAGE_URL AS homepage_url,
+                IFNULL(T3.RECEIPT_PRINT_TEXT, '') as receipt_print_text
+		   FROM TB_USER T1
+		   INNER JOIN TB_SALES_CORP T2
+		      ON T2.CORP_CD = T1.ACA_ID
+		   INNER JOIN TB_ACA T3
+		      ON T3.ACA_ID = T2.MAIN_ACA_ID
+		      AND T3.USE_YN = 'Y'
+		      AND T3.CONT_STAT IN ('00', '01')
+		   LEFT JOIN TB_EMP TE ON TE.EMP_ID = T1.USER_ID   
+		   LEFT JOIN TB_ACA_OPTION T5
+				ON T5.ACA_ID = T2.MAIN_ACA_ID
+		  WHERE T1.USER_ID = #{user_id}
+		    AND T1.USER_PWD = PASSWORD(#{user_pswd})
+		    AND T1.USE_YN = 'Y'
+		    AND T1.USER_GB_CD = '04'
+	</select>
+    <select id="getUserGrpRetrieve" parameterType="hashMap" resultType="string">
+	    SELECT B.AUTH_GRP_CD
+	      FROM TB_USER A INNER JOIN TB_USER_TP_AUTH_GRP B
+	      						 ON B.USER_ID = A.USER_ID
+			 			 INNER JOIN TB_AUTH_GRP_MENU C
+								 ON C.AUTH_GRP_CD = B.AUTH_GRP_CD
+								AND C.SITE_GB_CD = 'SG0001'
+	 	 WHERE A.USER_ID = #{user_id}
+		   AND A.USE_YN = 'Y'
+	  GROUP BY B.AUTH_GRP_CD
+	</select>
+	<insert id="createloginHist" parameterType="java.util.HashMap">
+		INSERT
+		  INTO TB_USER_CNCT_LOG(   USER_ID,
+					              IP,
+					              CNCT_SCS_YN,
+					              ENT_DTTM	)
+		VALUES ( #{user_id},
+				 #{ip},
+				 #{cnct_scs_yn},
+				 NOW() )
+	</insert>
+	<select id="getMenuRetrieve" parameterType="com.web.kdebate.common.common.domain.SessionVO" resultType="java.util.HashMap">
+		SELECT X.top_menu_id     AS top_menu_id
+		     , X.top_menu_name   AS top_menu_name
+		     , X.top_menu_type   AS top_menu_type
+		     , X.top_menu_url    AS top_menu_url
+		     , TRIM(X.view_icon1)  AS view_icon1
+		     , TRIM(X.view_yn1)  AS view_yn1
+		     , X.menu_ord1       AS menu_ord1
+		     , X.left1_menu_id   AS left1_menu_id
+		     , X.left1_menu_name AS left1_menu_name
+		     , X.left1_menu_type AS left1_menu_type
+		     , X.left1_menu_url  AS left1_menu_url
+		     , TRIM(X.view_yn2)  AS view_yn2
+		     , TRIM(X.view_icon2)  AS view_icon2
+		     , X.menu_ord2       AS menu_ord2
+		     , X.ord_2 AS ord_2
+ 		  FROM (
+				SELECT A.MENU_CD top_menu_id
+				     , A.MENU_NM top_menu_name
+				     , A.MENU_TP top_menu_type
+				     , A.MENU_URL top_menu_url
+				     , A.VIEW_YN view_yn1
+				     , A.MENU_ORD menu_ord1
+				     , A.VIEW_ICON view_icon1
+				     , C.MENU_CD left1_menu_id
+				     , C.MENU_NM left1_menu_name
+				     , C.MENU_TP left1_menu_type
+				     , C.MENU_URL left1_menu_url
+				     , C.VIEW_YN view_yn2
+				     , C.MENU_ORD menu_ord2
+				     , C.VIEW_ICON view_icon2
+				     , B.MENU_ORD ord_2
+				  FROM TB_MENU A
+				  LEFT JOIN TB_MENU B ON B.MENU_PRNT_CD = A.MENU_CD AND B.MENU_TP IN ('D', 'P') AND B.SITE_GB_CD = 'SG0001' AND B.USE_YN = 'Y' AND EXISTS (SELECT 'X' FROM TB_AUTH_GRP_MENU WHERE MENU_CD = B.MENU_CD AND SITE_GB_CD = 'SG0001' AND AUTH_GRP_CD IN <foreach item="item" index="index" collection="user_group" open="(" separator="," close=")">#{item}</foreach> )
+				  LEFT JOIN TB_MENU C ON C.MENU_PRNT_CD = B.MENU_CD AND C.MENU_TP IN ('D', 'P') AND C.SITE_GB_CD = 'SG0001' AND C.USE_YN = 'Y' AND EXISTS (SELECT 'X' FROM TB_AUTH_GRP_MENU WHERE MENU_CD = C.MENU_CD AND SITE_GB_CD = 'SG0001' AND AUTH_GRP_CD IN <foreach item="item" index="index" collection="user_group" open="(" separator="," close=")">#{item}</foreach> )
+				 WHERE A.MENU_PRNT_CD = 'M'
+				   AND A.MENU_TP IN ('D', 'P')
+				   AND A.USE_YN = 'Y'
+				   AND A.SITE_GB_CD = 'SG0001'
+				   AND EXISTS (SELECT 'X' FROM TB_AUTH_GRP_MENU WHERE MENU_CD = A.MENU_CD AND SITE_GB_CD = 'SG0001' AND AUTH_GRP_CD IN <foreach item="item" index="index" collection="user_group" open="(" separator="," close=")">#{item}</foreach> )
+					ORDER BY A.MENU_ORD, B.MENU_ORD , C.MENU_ORD
+				   ) X
+		 ORDER BY X.menu_ord1,  X.ord_2 , X.menu_ord2
+	</select>
+
+	<select id="getRoomRetrieve" parameterType="com.web.kdebate.common.common.domain.SessionVO" resultType="java.util.HashMap">
+		SELECT ROOM_NO AS room_no
+		     , ROOM_NM AS room_nm
+		     , CONCAT('/room/rooms/roomDip?room_no=', room_no) AS room_url
+ 		  FROM TB_CLASS_ROOM
+ 		 WHERE ACA_ID = #{aca_id}
+ 		   AND USE_YN ='Y'
+ 		   AND ROOM_TP = '2'
+		 ORDER BY ROOM_NO
+	</select>
+	
+	<select id="getAcaAllianceCnt" parameterType="com.web.kdebate.common.common.domain.SessionVO" resultType="int">
+	/* LoginMapper.getAcaAllianceCnt */
+		SELECT
+			COUNT(1)
+		FROM
+			TB_ACA_ALLIAN
+		WHERE
+			ACA_ID = #{aca_id}		
+	</select>
+	
+	<select id="getAcaAllianceList" parameterType="com.web.kdebate.common.common.domain.SessionVO" resultType="java.util.HashMap">
+	/* LoginMapper.getAcaAllianceList */
+		SELECT
+			A.ACA_ID AS aca_id
+			, A.ACA_NM AS aca_nm
+		FROM
+		(
+			SELECT 
+				B.ACA_ID
+				, B.ACA_NM 
+			FROM 
+				TB_ACA_ALLIAN AS A
+			JOIN 
+				TB_ACA AS B ON A.ALLIAN_ACA_ID = B.ACA_ID
+			WHERE 
+				A.ALLIAN_ACA_ID = #{aca_id}
+			UNION ALL 
+			SELECT 
+				B.ACA_ID
+				, B.ACA_NM 
+			FROM 
+				TB_ACA_ALLIAN AS A
+			JOIN 
+				TB_ACA AS B ON A.ALLIAN_ACA_ID = B.ACA_ID
+			WHERE 
+				A.ACA_ID = #{aca_id}
+		) AS A
+		GROUP BY A.ACA_ID	
+	</select>
+
+	<update id="lastLoginUpdate" parameterType="com.web.kdebate.common.common.domain.SessionVO">
+		UPDATE TB_USER
+     	   SET LST_CONN_DTTM = NOW()
+   		 WHERE USER_ID = #{user_id}
+	</update>
+
+	<select id="getLinkList" resultType="java.util.HashMap">
+		SELECT CODE AS link_code
+			 , CODE_NM AS link_code_nm
+		  FROM TB_CODE
+		 WHERE USE_YN ="Y"
+		   AND CODE_GRP_CD = "LINK_URL"
+		   AND CODE != "CODE"
+	</select>
+</mapper>

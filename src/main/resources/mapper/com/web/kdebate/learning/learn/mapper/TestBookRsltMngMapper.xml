@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.web.kdebate.learning.learn.mapper.TestBookRsltMngMapper">
+
+	<select id="getQueryTotalCnt" resultType="int">
+	/* TestBookRsltMngMapper.getQueryTotalCnt */
+		SELECT FOUND_ROWS()
+	</select>
+
+	<select id="getClassListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* TestBookRsltMngMapper.getClassListRetrieve */
+		SELECT 
+		     TC.CLASS_NM AS class_nm
+		   , TC.CLASS_CD AS class_cd
+		FROM
+			TB_CLASS TC
+		WHERE 1=1
+		AND TC.ACA_ID = #{aca_id}
+		AND TC.CLASS_STATUS = '01'
+		AND TC.USE_YN = 'Y'
+		AND DATE(NOW()) BETWEEN TC.CLASS_SDT AND TC.CLASS_EDT
+		<if test='live_chk == "Y"'>
+			AND CLASS_ON_CHK = 'Y' /* 인라이브 */
+		</if>
+		ORDER BY CASE WHEN TC.CLASS_NM IS NULL THEN '0' END
+				, TC.CLASS_NM
+	</select>
+	
+	<select id="getStudentListRetrieve" parameterType="hashMap" resultType="hashMap">
+	 /* TestBookRsltMngMapper.getStudentListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   A.STD_ID AS std_id
+			 , A.ACA_ID AS aca_id
+		     , A.ACA_NM AS aca_nm
+		     , IFNULL(CONCAT(A.SCH_NM, " ", A.SCH_LVL_NM), '') AS ach_nml
+		     , A.STD_NM AS std_nm
+		     , A.SCH_NM AS sch_nm
+		     , A.SCH_LVL_NM AS sch_lvl_nm
+		     , A.SCH_LVL AS sch_lvl
+		     , A.SCH_GRADE_NM AS sch_grade_nm
+		     , A.SCH_GRADE AS sch_grade
+		     , A.CLS as cls
+		     , IFNULL(A.CLASS_NM, '') AS class_nm
+		     , A.ENT_DTTM AS ent_dttm
+		     , A.STD_STATUS AS std_status
+		     , A.STD_STATUS_NM AS std_status_nm
+		     , A.CLASS_CD AS class_cd
+		     , CASE WHEN A.HP_NO IS NULL OR A.HP_NO = '' THEN A.PARENT_HP_NO
+		     		ELSE A.HP_NO
+	     	   END AS hp_no
+		     , A.STD_PARENT_HP_NO AS std_parent_hp_no		
+     		 , A.PARENT_NM AS parent_nm
+		     , A.USER_NM		
+		  FROM
+		 (SELECT T1.STD_ID
+		       , T1.ACA_ID
+		       , T3.ACA_NM
+			   , CASE WHEN T1.ACA_ID IN(#{my_aca_id}, #{srch_center}) THEN T1.STD_NM ELSE CONCAT(T1.STD_NM, ' (', T3.ACA_NM, ')') END AS STD_NM
+		       , T1.SCH_NM
+		       , T1.SCH_CD
+		       , FC_GET_CODE_NM('SCH_LVL', T1.SCH_LVL) AS SCH_LVL_NM
+		       , T1.SCH_LVL
+		       , T1.SCH_GRADE
+		       , FC_GET_CODE_NM('SCH_GRADE', T1.SCH_GRADE) AS SCH_GRADE_NM
+		       , T1.CLS
+		       , TCS.CLASS_NM
+		       , DATE_FORMAT(T1.ENT_DTTM, '%Y-%m-%d') AS ENT_DTTM
+		       , DATE_FORMAT(T1.UPT_DTTM, '%Y-%m-%d') AS UPT_DTTM
+		       , T1.STD_STATUS
+		       , FC_GET_CODE_NM('STD_STATUS', T1.STD_STATUS) AS STD_STATUS_NM
+			   , (SELECT IF(SUM(IF(PAY_YN = 'N', 1, 0)) > 0, 'N', IF(SUM(IF(PAY_YN = 'Y', 1, 0)) > 0, 'Y', ''))			   
+			      FROM
+			      	TB_INVOICE
+			   	  WHERE
+			   	  	STD_ID = T1.STD_ID
+			   	  	AND INVOICE_GB = '01'
+			   	  ) AS pay_yn
+			   , TP.USER_NM AS PARENT_NM
+		       , (SELECT T2.HP_NO
+			        FROM TB_PARENTS TP
+			        JOIN TB_USER T2
+			          ON T2.USER_ID = TP.PARENT_ID
+			       WHERE TP.STD_ID = T1.STD_ID
+			         AND TP.REP_PARENT_YN = 'Y'
+			         AND T2.USE_YN = 'Y') AS STD_PARENT_HP_NO
+			   , TSC.CLASS_CD
+              , (SELECT HP_NO FROM TB_USER WHERE USER_ID = TP.PARENT_ID) AS PARENT_HP_NO
+              , TP.USER_NM
+              , T2.HP_NO AS HP_NO
+	       FROM TB_STD_INFO T1
+	       JOIN TB_USER T2
+	         ON T2.USER_ID = T1.STD_ID
+			<choose>
+				<when test='p_aca_id != null and p_aca_id != ""'>
+					JOIN VW_MY_ACA_LIST T3 ON T3.ACA_ID = T1.ACA_ID
+		   						  AND T3.MY_ACA_ID = #{my_aca_id}
+				</when>
+				<otherwise>
+					LEFT JOIN TB_ACA T3 ON T3.ACA_ID = T1.ACA_ID
+				</otherwise>
+			</choose>
+		   LEFT JOIN TB_STD_CLASS TSC
+		     ON TSC.STD_ID = T1.STD_ID
+           LEFT OUTER JOIN (SELECT A.PARENT_ID
+           						 , A.STD_ID
+           						 , B.USER_NM
+           					  FROM TB_PARENTS A
+           					  JOIN TB_USER B ON B.USER_ID = A.PARENT_ID
+           					 WHERE REP_PARENT_YN = 'Y') TP
+           	 ON TP.STD_ID = T1.STD_ID
+	           	LEFT OUTER JOIN (
+					SELECT
+						TCS.CLASS_CD
+						, TCS.STD_ID
+						, CASE WHEN COUNT(1) > 1 THEN CONCAT(TC.CLASS_NM, '외 ',  CAST(COUNT(1) - 1 AS VARCHAR(1)), '건') ELSE TC.CLASS_NM END AS CLASS_NM
+					FROM(
+						SELECT CLASS_CD, STD_ID FROM TB_CLASS_STD
+						WHERE 1=1
+						AND CLASS_APPLY_STATUS = '01'
+						ORDER BY ENT_DTTM DESC
+					) AS TCS
+					JOIN TB_CLASS TC ON TC.CLASS_CD = TCS.CLASS_CD
+					AND TC.CLASS_STATUS IN ('01','03','04')
+					AND TC.USE_YN = 'Y'
+					GROUP BY TCS.STD_ID
+				) TCS ON TCS.STD_ID = T1.STD_ID
+	  		) A
+		  WHERE 1=1
+		  <!-- <choose>
+		  	<when test='p_aca_id != null and p_aca_id != ""'>
+				<if test='srch_center != null and srch_center != ""'>
+					AND A.ACA_ID = #{srch_center}
+				</if>
+		  	</when>
+			<otherwise>
+				<if test='live_chk == "N"'>
+					AND A.ACA_ID = #{my_aca_id}
+				</if>
+			</otherwise>
+		  </choose> -->
+		  <if test='srch_center != null and srch_center != ""'>
+				AND A.ACA_ID = #{srch_center}
+		  </if>
+	      <if test="srch_tp != '' and srch_tp != null">
+	      	<if test="srch_tp == '01'">
+	      		<if test="srch_tp_inp != ''">
+	      			AND A.STD_NM LIKE CONCAT('%',#{srch_tp_inp},'%')
+	      		</if>
+	      	</if>
+	      	<if test="srch_tp == '02'">
+	      		AND A.STD_ID LIKE CONCAT('%',#{srch_tp_inp},'%')
+	      	</if>
+	      	<if test="srch_tp == '03'">
+	      		AND A.HP_NO LIKE CONCAT('%',#{srch_tp_inp},'%')
+	      	</if>
+	      	<if test="srch_tp == '04'">
+	      		AND A.PARENT_HP_NO LIKE CONCAT('%',#{srch_tp_inp},'%')
+	      	</if>
+	      	<if test="srch_tp == '05'">				
+				AND A.STD_ID IN (SELECT STD_ID FROM TB_PARENTS WHERE PARENT_ID IN (SELECT USER_ID FROM TB_USER WHERE USER_GB_CD = '03' AND USER_NM LIKE CONCAT('%',#{srch_tp_inp},'%')))        	
+	      	</if>
+	      </if>
+	      <if test="srch_status_cnt != 0">
+		  	 AND A.STD_STATUS IN
+		   	<foreach item="item" index="index" collection="srch_status_list" open="(" separator="," close=")">
+			      #{item}
+			</foreach>
+		  </if>
+		  <if test='aca_mng_cls_srch != null and aca_mng_cls_srch != ""'>
+		  	AND A.CLASS_CD = #{aca_mng_cls_srch}
+		  </if>
+		  <if test='srch_grade != null and srch_grade != ""'>
+		  	AND A.SCH_GRADE = #{srch_grade}
+		  </if>
+		  <if test='srch_sch_lvl != null and srch_sch_lvl != ""'>
+		  	AND A.SCH_LVL = #{srch_sch_lvl}
+		  </if>
+		  <if test='srch_sch_cd != null and srch_sch_cd != ""'>
+		  	AND A.SCH_CD = #{srch_sch_cd}
+		  </if>
+		  <if test='srch_mng_class != null and srch_mng_class !=""'>
+		  	AND A.STD_ID IN (SELECT STD_ID FROM TB_CLASS_STD WHERE CLASS_CD = #{srch_mng_class} AND CLASS_APPLY_STATUS = '01')
+		  </if>
+  	      <choose>
+			<when test="sidx != '' and sord !=''">
+			ORDER BY ${sidx} ${sord}
+			</when>
+  			<otherwise>
+				ORDER BY CASE WHEN A.ACA_ID = #{my_aca_id} THEN 0 ELSE A.ACA_ID END, A.STD_NM, A.SCH_NM
+			</otherwise>
+		 </choose>
+		 LIMIT ${start}, ${end}
+	</select>
+		
+	<select id="getExamListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* TestBookRsltMngMapper.getExamListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+				  rpt.id AS rpt_id
+				, rpt.unique_code AS unique_code
+				, rpt.user_id AS user_id
+				, wu.user_login	AS lms_std_id
+				, wu.display_name AS user_nm
+				, rpt.quiz_id AS quiz_id
+				, cat.description AS reading_lvl
+				, cat.title AS reading_lvl_nm
+				, qz.title AS book_nm
+				, date_format(rpt.start_date, '%Y-%m-%d %H:%i') AS start_dtm
+				, date_format(rpt.end_date, '%Y-%m-%d %H:%i') AS end_dtm
+				, rpt.duration AS duration
+				, CONCAT(TRUNCATE(rpt.duration / 60, 0), '분 ', MOD(rpt.duration, 60), '초') AS dura
+				, NVL(rslt.ex1_c, 0) AS ex1_c
+				, NVL(rslt.ex1_t, 0) AS ex1_t
+				, NVL(rslt.ex2_c, 0) AS ex2_c
+				, NVL(rslt.ex2_t, 0) AS ex2_t
+				, NVL(rslt.ex3_c, 0) AS ex3_c
+				, NVL(rslt.ex3_t, 0) AS ex3_t
+				, NVL(rslt.ex4_c, 0) AS ex4_c
+				, NVL(rslt.ex4_t, 0) AS ex4_t
+				, CONCAT(NVL(rslt.ex1_c, 0), ' / ', NVL(rslt.ex1_t, 0)) AS score_1
+        		, CONCAT(NVL(rslt.ex2_c, 0), ' / ', NVL(rslt.ex2_t, 0)) AS score_2
+        		, CONCAT(NVL(rslt.ex3_c, 0), ' / ', NVL(rslt.ex3_t, 0)) AS score_3
+        		, CONCAT(NVL(rslt.ex4_c, 0), ' / ', NVL(rslt.ex4_t, 0)) AS score_4
+				, rpt.score AS score
+				, rpt.points AS points
+				, rpt.questions_count AS questions_count
+				, CONCAT(rpt.points, ' / ', rpt.questions_count) AS total_score
+				, concat(round((rpt.corrects_count / rpt.questions_count)* 100, 0), '%') AS corrate_rate        
+		FROM 	
+			classin_kdebate.TB_STD_INFO TSI 	
+		JOIN classin_kdebate_web.wp_users wu ON  wu.user_login = TSI.STD_ID
+		JOIN classin_kdebate_web.wp_aysquiz_reports rpt
+			ON rpt.user_id = wu.id 
+			<if test='srch_str_date != "" and srch_end_date != ""'>
+				AND rpt.start_date between DATE(#{srch_str_date}) and DATE(#{srch_end_date})                            
+			</if>
+		JOIN classin_kdebate_web.wp_aysquiz_quizes qz
+			ON qz.id = rpt.quiz_id 
+			<if test="srch_book_id != null and srch_book_id != '' ">
+				AND qz.id = #{srch_book_id}
+			</if>
+		JOIN classin_kdebate_web.wp_aysquiz_quizcategories cat
+			ON qz.quiz_category_id = cat.id
+			<if test='std_p_lvl_cd !="" and std_lvl_cd == ""'>
+				AND cat.description LIKE CONCAT('%', #{std_p_lvl_cd}, '%')
+			</if>
+			<if test='std_lvl_cd != "" and std_lvl_cd != null'>
+				AND cat.description = #{std_lvl_cd}
+			</if>
+		LEFT OUTER JOIN (
+				SELECT   rans.id
+						, SUM(case when qus.explanation = '어휘' then (case when rans.ox = 'O' then 1 else null end) else null end) as ex1_c
+						, SUM(case when qus.explanation = '어휘' then 1 else null end) as ex1_t
+						, concat(round(SUM(case when qus.explanation = '어휘' then (case when rans.ox = 'O' then 1 else null end) else null end) 
+										/ SUM(case when qus.explanation = '어휘' then 1 else null end) * 100, 0)
+								, '%') as ex1_rate						  
+						, SUM(case when qus.explanation = '사실' then (case when rans.ox = 'O' then 1 else null end) else null end) as ex2_c
+						, SUM(case when qus.explanation = '사실' then 1 else null end) as ex2_t
+						, concat(round(SUM(case when qus.explanation = '사실' then (case when rans.ox = 'O' then 1 else null end) else null end) 
+						/ SUM(case when qus.explanation = '사실' then 1 else null end) * 100, 0), '%') as ex2_rate
+						
+						, SUM(case when qus.explanation = '추론' then (case when rans.ox = 'O' then 1 else null end) else null end) as ex3_c
+						, SUM(case when qus.explanation = '추론' then 1 else null end) as ex3_t
+						, concat(round(SUM(case when qus.explanation = '추론' then (case when rans.ox = 'O' then 1 else null end) else null end) 
+						/ SUM(case when qus.explanation = '추론' then 1 else null end) * 100, 0), '%') as ex3_rate
+						
+						, SUM(case when qus.explanation = '비판' then (case when rans.ox = 'O' then 1 else null end) else null end) as ex4_c
+						, SUM(case when qus.explanation = '비판' then 1 else null end) as ex4_t
+						, concat(round(SUM(case when qus.explanation = '비판' then (case when rans.ox = 'O' then 1 else null end) else null end) 
+						/ SUM(case when qus.explanation = '비판' then 1 else null end) * 100, 0), '%') as ex4_rate
+						
+						, SUM(case when rans.ox = 'O' then 1 else null end) as tot_c
+						, count(1)	as tot_t
+						, concat(round(SUM(case when rans.ox = 'O' then 1 else null end) / count(1) * 100, 0), '%') as tot_rate
+						
+				FROM 	classin_kdebate_web.wp_aysquiz_reports_answers rans  
+						join classin_kdebate_web.wp_aysquiz_questions qus on qus.id = rans.answer_id
+				GROUP	BY rans.id
+		) rslt on rslt.id = rpt.id
+		WHERE
+			TSI.STD_ID = #{std_id}
+		<choose>
+			<when test="sidx != '' and sord !=''">
+				ORDER BY ${sidx} ${sord}
+			</when>
+			<otherwise>
+				ORDER BY rpt.end_date DESC, cat.description
+			</otherwise>
+		</choose>
+	</select> 
+
+	<select id="getBookListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* TestBookRsltMngMapper.getBookListRetrieve */
+		SELECT
+			  qz.id AS qz_id
+			, qz.title AS qz_title
+			, qz.quiz_category_id AS qz_category_id
+			, cat.title AS cat_title
+			, cat.description AS cat_description
+			, cat.id AS cat_id
+		FROM
+			classin_kdebate_web.wp_aysquiz_quizes qz 
+		JOIN
+			classin_kdebate_web.wp_aysquiz_quizcategories cat
+			ON qz.quiz_category_id = cat.id
+			and cat.description = #{std_lvl_cd}
+	</select>
+
+	<select id="getExamChartRsltRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* TestBookRsltMngMapper.getExamChartRsltRetrieve */
+		select  rpt.id	as rpt_id
+				, rpt.unique_code
+				, rpt.quiz_id
+				, qz.title as book_nm
+				, date_format(rpt.start_date, '%Y-%m-%d') as start_dtm
+				, date_format(rpt.end_date, '%Y-%m-%d') as end_dtm
+				, rpt.score
+				, rpt.points
+				, rpt.questions_count
+				, concat(round((rpt.corrects_count / rpt.questions_count)* 100, 0), '%') as corrate_rate        
+		from 	classin_kdebate.TB_STD_INFO TSI 	
+				JOIN classin_kdebate_web.wp_users wu ON  wu.user_login = TSI.STD_ID
+				JOIN classin_kdebate_web.wp_aysquiz_reports rpt ON rpt.user_id = wu.id
+					<if test='srch_str_date != "" and srch_end_date != "" and srch_str_date != null and srch_end_date != null'>
+						and rpt.start_date between DATE(#{srch_str_date}) and DATE(#{srch_end_date})                            
+					</if>
+				JOIN classin_kdebate_web.wp_aysquiz_quizes qz ON qz.id = rpt.quiz_id 
+				
+		WHERE	TSI.STD_ID = #{std_id}
+		order  by rpt.end_date desc
+		limit	10
+	</select>
+
+	<select id="getExamDtlRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* TestBookRsltMngMapper.getExamDtlRetrieve */
+		select  rpt.id	as rpt_id
+				, rpt.user_id
+				, CONCAT(TSI.SCH_NM, " ",classin_kdebate.FC_GET_CODE_NM('SCH_LVL', TSI.SCH_LVL)) AS sch_nm
+				, wu.user_login	as lms_std_id
+				, wu.display_name	as user_nm
+				, rpt.quiz_id
+				, qz.title
+				, date_format(rpt.start_date, '%Y-%m-%d %H:%i') as start_dtm
+				, date_format(rpt.end_date, '%Y-%m-%d %H:%i') as end_dtm
+				, rpt.duration
+				, concat(truncate(rpt.duration / 60, 0), '분 ', mod(rpt.duration, 60), '초')  dura
+				, rpt.score
+				, rpt.points
+				, rpt.questions_count
+				, concat(round((rpt.corrects_count / rpt.questions_count)* 100, 0), '%') as corrate_rate
+				, rpt.unique_code as unique_code
+		from 	classin_kdebate_web.wp_aysquiz_reports rpt
+				join classin_kdebate_web.wp_users wu on wu.id = rpt.user_id
+				join classin_kdebate_web.wp_aysquiz_quizes qz on qz.id = rpt.quiz_id 
+				JOIN classin_kdebate.TB_STD_INFO TSI ON TSI.STD_ID = wu.user_login
+		where rpt.id = #{rpt_id}
+	</select>
+
+	<select id="getQuestionInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* TestBookRsltMngMapper.getQuestionInfoRetrieve */
+		SELECT  rans.answer_id 
+				, rans.std_answer
+				, case when qus.explanation = '어휘' then rans.ox else '' end as ex1
+				, case when qus.explanation = '사실' then rans.ox else '' end as ex2
+				, case when qus.explanation = '추론' then rans.ox else '' end as ex3
+				, case when qus.explanation = '비판' then rans.ox else '' end as ex4
+				, rans.ox		as correct
+				, rans.point
+		FROM 	classin_kdebate_web.wp_aysquiz_reports rpt
+				JOIN classin_kdebate_web.wp_aysquiz_reports_answers rans ON rans.id = rpt.id
+														and rans.quiz_id = rpt.quiz_id
+				join classin_kdebate_web.wp_aysquiz_questions qus on qus.id = rans.answer_id
+		where	rpt.id = #{rpt_id}
+		order	 by 1 
+	</select>
+
+	<select id="getStatisticsInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* TestBookRsltMngMapper.getStatisticsInfoRetrieve */
+		SELECT    SUM(case when qus.explanation = '어휘' then (case when rans.ox = 'O' then 1 else null end) else null end) as ex1_c
+				, SUM(case when qus.explanation = '어휘' then 1 else null end) as ex1_t
+				, concat(round(SUM(case when qus.explanation = '어휘' then (case when rans.ox = 'O' then 1 else null end) else null end) 
+								/ SUM(case when qus.explanation = '어휘' then 1 else null end) * 100, 0)
+						, '%') as ex1_rate
+				
+				, SUM(case when qus.explanation = '사실' then (case when rans.ox = 'O' then 1 else null end) else null end) as ex2_c
+				, SUM(case when qus.explanation = '사실' then 1 else null end) as ex2_t
+				, concat(round(SUM(case when qus.explanation = '사실' then (case when rans.ox = 'O' then 1 else null end) else null end) 
+				/ SUM(case when qus.explanation = '사실' then 1 else null end) * 100, 0), '%') as ex2_rate
+				
+				, SUM(case when qus.explanation = '추론' then (case when rans.ox = 'O' then 1 else null end) else null end) as ex3_c
+				, SUM(case when qus.explanation = '추론' then 1 else null end) as ex3_t
+				, concat(round(SUM(case when qus.explanation = '추론' then (case when rans.ox = 'O' then 1 else null end) else null end) 
+				/ SUM(case when qus.explanation = '추론' then 1 else null end) * 100, 0), '%') as ex3_rate
+				
+				, SUM(case when qus.explanation = '비판' then (case when rans.ox = 'O' then 1 else null end) else null end) as ex4_c
+				, SUM(case when qus.explanation = '비판' then 1 else null end) as ex4_t
+				, concat(round(SUM(case when qus.explanation = '비판' then (case when rans.ox = 'O' then 1 else null end) else null end) 
+				/ SUM(case when qus.explanation = '비판' then 1 else null end) * 100, 0), '%') as ex4_rate
+				
+				, SUM(case when rans.ox = 'O' then 1 else null end) as tot_c
+				, count(1)	as tot_t
+				, concat(round(SUM(case when rans.ox = 'O' then 1 else null end) / count(1) * 100, 0), '%') as tot_rate
+		FROM 	classin_kdebate_web.wp_aysquiz_reports rpt
+				JOIN classin_kdebate_web.wp_aysquiz_reports_answers rans ON rans.id = rpt.id
+														and rans.quiz_id = rpt.quiz_id
+				join classin_kdebate_web.wp_aysquiz_questions qus on qus.id = rans.answer_id
+		where	rpt.id = #{rpt_id}
+		order	 by 1 
+	</select>
+
+	<select id="getSmsInfo" parameterType="hashMap" resultType="hashMap">
+	/* TestBookRsltMngMapper.getSmsInfo */
+		select  'LM' AS MT_TYPE
+				, classin_kdebate.FN_GET_PARENT_HPNO(TU.USER_ID) AS PHONE_NUMBER
+				, TA.TEL_NO 			AS CALLBACK
+				, CONCAT(TU.USER_NM, ' 독서레벨 평가서')	AS TITLE
+				, CONCAT(
+							'안녕하세요. ', TA.ACA_NM, ' 입니다.\n', chr(13)
+							, TU.USER_NM, ' 원생이 "', qz.title, '" 을 읽고 독서평가를 하였습니다.\n', chr(13)
+							, '아래 URL을 클리하여 독서 평가결과를 확인하세요\n', chr(13)
+							, #{req_url}, chr(13)
+							, '\n', chr(13)
+							, TA.ACA_NM, ' 드림'
+						) AS MESSAGE
+				, DATE(NOW())		AS REQUEST_DATE
+				, DATE(NOW())		AS REPORT_DATE
+				, TA.ACA_ID			AS ACA_ID
+				, TU.USER_ID		AS STD_ID
+				, TA.BOSS_ID		AS BOSS_ID
+		from 	classin_kdebate_web.wp_aysquiz_reports rpt
+				join classin_kdebate_web.wp_users wu on wu.id = rpt.user_id
+				join classin_kdebate_web.wp_aysquiz_quizes qz on qz.id = rpt.quiz_id 
+				JOIN classin_kdebate.TB_USER TU ON TU.USER_ID = wu.user_login
+				JOIN classin_kdebate.TB_ACA  TA ON TA.ACA_ID = TU.ACA_ID
+		where rpt.id = #{rpt_id}
+	</select>
+
+	<insert id="reportSmsCreate" parameterType="hashMap">
+	/* TestBookRsltMngMapper.reportSmsCreate */
+	INSERT INTO
+			TB_SMS
+				(
+					  MT_TYPE
+					, PHONE_NUMBER
+					, CALLBACK
+					, TITLE
+					, MESSAGE
+					, REQUEST_DATE
+					, ACA_ID
+					, STD_ID
+					, SMS_CONT_TP
+					, STATUS
+					, ENT_USER_ID
+					, ENT_DTTM
+				)
+			VALUES
+				(
+					  #{MT_TYPE}
+					, #{PHONE_NUMBER}
+					, #{CALLBACK}
+					, #{TITLE}
+					, #{MESSAGE}
+					, #{REQUEST_DATE}
+					, #{ACA_ID}
+					, #{STD_ID}
+					, "03"
+					, "0"
+					, #{BOSS_ID}
+					, NOW()
+				)
+	</insert>
+
+</mapper>

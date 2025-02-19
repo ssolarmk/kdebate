@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout" layout:decorate="~{layouts/default}" layout:fragment="Content">
+  <head>
+    <title>사용자 관리</title>
+    <script src="/vendors/tinymce/tinymce.min.js"></script>
+    <script src="/vendors/datatables.net/dataTables.min.js"></script>
+    <script src="/vendors/datatables.net-bs5/dataTables.bootstrap5.min.js"></script>
+    <script src="/vendors/datatables.net-fixedcolumns/dataTables.fixedColumns.min.js"></script>
+    <script src="/vendors/dropzone/dropzone-min.js"></script>
+    <script src="/js/jquery.form.js"></script>
+    <link rel="stylesheet" href="/vendors/datatables.net-bs5/dataTables.bootstrap5.min.css" />
+    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  </head>
+  <script>
+    function fn_emp_auth_grp_cdChange(modify) {
+      let empAuthGrpCd = $("#emp_auth_grp_cd").select2("data");
+      let empWorkCd = $("#emp_work_cd").select2("data");
+      let empTp = document.getElementById("emp_tp").value;
+      let flag = 0;
+
+      if (empTp == "01") {
+        flag++;
+      }
+      empAuthGrpCd.filter((item) => {
+        if (item.id == "AG0102") {
+          flag++;
+        }
+      });
+      empWorkCd.filter((item) => {
+        if (item.id == "01") {
+          flag++;
+        }
+      });
+    }
+    function openZipSearch() {
+      new daum.Postcode({
+        oncomplete: function (data) {
+          // 팝업에서 검색결과 항목을 클릭했을때 실행할 코드를 작성하는 부분.
+          var addr = ""; // 주소 변수
+
+          //사용자가 선택한 주소 타입에 따라 해당 주소 값을 가져온다.
+          if (data.userSelectedType === "R") {
+            // 사용자가 도로명 주소를 선택했을 경우
+            addr = data.roadAddress;
+          } else {
+            // 사용자가 지번 주소를 선택했을 경우(J)
+            addr = data.jibunAddress;
+          }
+
+          // 우편번호와 주소 정보를 해당 필드에 넣는다.
+          $("#emp_zip_code").val(data.zonecode);
+          $("#emp_addr").val(addr);
+          $("#emp_addr_dtl").val("");
+          $("#emp_addr_dtl").focus();
+        },
+      }).open();
+    }
+    var bossYn = "";
+    const no_img_path = "http://cliquecities.com/assets/no-image-e3699ae23f866f6cbdf8ba2443ee5c4e.jpg";
+    $(function () {
+      var aca_id = "";
+      var session_aca_id = "[[${session.S_USER.aca_id}]]";
+      var session_p_aca_id = "[[${session.S_USER.p_aca_id}]]";
+      $("#frm_emp_info").onLoadFunction();
+
+      $("div[name=emp_pay]").hide();
+
+      var userGrp = "[[${session.S_USER.user_group}]]";
+      userGrp = userGrp.replace("[", "");
+      userGrp = userGrp.replace("]", "");
+      userGrp = userGrp.split(", ");
+      bossYn = "";
+
+      for (var i = 0; i < userGrp.length; i++) {
+        if (userGrp[i] == "AG0101") {
+          bossYn = "Y";
+          $("div[name=emp_pay]").show();
+        }
+      }
+
+      if (session_p_aca_id == "") {
+        bossYn = "Y";
+        $("div[name=emp_pay]").show();
+      }
+
+      callAjax("/common/common/totalCodelist", "CODE_GRP_CD=('EMP_TP','JISA_CD')", fn_code_setting);
+
+      function fn_code_setting(data) {
+        codeSetting("EMP_TP", data.data, "#emp_tp", "1", "", "");
+      }
+
+      callAjax("/center/user/empMng/acaIdChk", "", fn_aca_setting);
+
+      function fn_aca_setting(data) {
+        // 체크유무 -> Y 이면 본사, N 이면 하위 그룹
+        aca_id = data.data.aca_id;
+        var aca_chk = data.data.aca_chk_yn;
+
+        if (aca_chk == "M") {
+          $("#emp_dept_frm_group").show();
+          $("#emp_p_auth_frm").show();
+          $("#emp_aca_auth_frm").hide();
+
+          callAjaxCombo("/common/common/codelist", "CODE_GRP_CD=JISA_CD", "#emp_dept", "3", "");
+          callAjaxCombo("/common/common/codelist", "CODE_GRP_CD=AUTH_GRP_CD&CHK_CD1=" + aca_chk, "#emp_p_auth_grp_cd", "3", "");
+          callAjaxCombo("/common/common/codelist", "CODE_GRP_CD=AUTH_GRP_CD&CHK_CD1=" + "C", "#emp_auth_grp_cd", "3", "");
+        } else {
+          $("#emp_p_auth_frm").hide();
+          $("#emp_aca_auth_frm").show();
+
+          callAjaxCombo("/common/common/codelist", "CODE_GRP_CD=AUTH_GRP_CD&CHK_CD1=" + aca_chk, "#emp_auth_grp_cd", "3", "");
+        }
+
+        callAjaxCombo("/common/common/codelist", "CODE_GRP_CD=WORK_CD", "#emp_work_cd", "3", "");
+
+        if (aca_chk == "M") {
+          fn_srch_center_set();
+          fn_center_set();
+        } else {
+          tbl_emp_list.ajax.reload();
+        }
+      }
+
+      /* 검색 조건 캠퍼스 리스트 조회  */
+      function fn_srch_center_set() {
+        // 캠퍼스목록 조회
+        callAjax("/common/common/centerListRetrieve", "", function (data) {
+          var str = "";
+          var datas = data.data;
+
+          if (datas.length > 0) {
+            if (datas.length == 1) {
+              str += "<option value=" + datas[0].aca_id + ">" + datas[0].aca_nm + "</option>";
+            } else {
+              str += "<option value=''>전 체</option>";
+
+              for (var i = 0; i < datas.length; i++) {
+                str += "<option value=" + datas[i].aca_id + ">" + datas[i].aca_nm + "</option>";
+              }
+            }
+          }
+
+          $("#srch_center").append(str);
+          $("#srch_center").trigger("change");
+
+          tbl_emp_list.ajax.reload();
+        });
+      }
+
+      /* 상세내용 캠퍼스 리스트 */
+      function fn_center_set() {
+        callAjax("/common/common/centerListRetrieve", "", function (data) {
+          var str = "";
+          var datas = data.data;
+
+          if (datas.length > 0) {
+            str += "<option value=''>선 택</option>";
+
+            for (var i = 0; i < datas.length; i++) {
+              str += "<option value=" + datas[i].aca_id + ">" + datas[i].aca_nm + "</option>";
+            }
+          }
+
+          $("#emp_aca_id").append(str);
+        });
+      }
+
+      $("#btn_user_srch").click(function () {
+        var srch_tp = $("#srch_tp").val();
+        var srch_tp_inp = $("#srch_tp_inp").val();
+
+        if (srch_tp == "" && srch_tp_inp != "") {
+          swal("경고", "검색구분을 선택해주십시오.", "error");
+          return;
+        }
+
+        tbl_emp_list.ajax.reload();
+      });
+      var tbl_emp_list = $("#tbl_emp_list").DataTable({
+        processing: true,
+        serverSide: true,
+        select: true,
+        responsive: true,
+        paging: true,
+        lengthChange: false,
+        searching: false,
+        ordering: true,
+        autoWidth: false,
+        responsive: true,
+        scrollCollapse: true,
+        pageLength: 10,
+        info: false,
+        language: {
+          emptyTable: "데이터가 없습니다.",
+          search: "검색:",
+          zeroRecords: "일치하는 데이터가 없습니다.",
+          loadingRecords: "로딩중...",
+          processing: "처리중...",
+        },
+        ajax: {
+          url: "/center/user/empMng/getEmpListRetrieve",
+          contentType: "application/json",
+          type: "POST",
+          data: function (postData) {
+            formData = $("#frm_emp_srch").serializeObject();
+            Object.assign(postData, formData);
+            return JSON.stringify(postData);
+          },
+        },
+        columns: [{ data: "emp_user_nm" }, { data: "emp_user_id" }, { data: "emp_hp_no" }, { data: "emp_use_yn_nm" }, { data: "emp_auth_grp_nm" }, { data: "emp_ent_user_id" }],
+      });
+      var tbl_cnct_log_list = $("#tbl_cnct_log_list").DataTable({
+        processing: true,
+        serverSide: true,
+        select: true,
+        responsive: true,
+        paging: true,
+        lengthChange: false,
+        searching: false,
+        ordering: true,
+        autoWidth: false,
+        responsive: true,
+        scrollCollapse: true,
+        pageLength: 5,
+        info: false,
+        language: {
+          emptyTable: "데이터가 없습니다.",
+          search: "검색:",
+          zeroRecords: "일치하는 데이터가 없습니다.",
+          loadingRecords: "로딩중...",
+          processing: "처리중...",
+        },
+        ajax: {
+          url: "/center/user/userMng/userCnctLogListRetrieve",
+          contentType: "application/json",
+          type: "POST",
+          data: function (postData) {
+            formData.user_id = $("#emp_user_id").val();
+            Object.assign(postData, formData);
+            return JSON.stringify(postData);
+          },
+        },
+        columns: [{ data: "cnct_log_ip" }, { data: "ent_dttm" }, { data: "cnct_scs_yn" }],
+      });
+      $("#tbl_emp_list tbody").on("click", "tr", function () {
+        $("#frm_emp_info").clearForm();
+        var row = tbl_emp_list.row(this).data();
+        $("#emp_auth_grp_cd").val("");
+        $("#frm_emp_info").autoMapping(row);
+        if (row.emp_tp == "01") {
+          $("div[name=emp_did]").hide();
+          $("div[name=" + "live_teach" + "]").show();
+          $("input:radio[name='live_teach_yn']:radio[value='" + row.live_teach_yn + "']").prop("checked", true);
+          $("div[name=emp_user]").show();
+          $("div[name=emp_pay]").show();
+
+          let grpChk = row.emp_auth_grp_cd;
+          let workChk = row.emp_work_cd;
+          if (grpChk.indexOf() != -1 && workChk.indexOf("01") != -1) {
+            document.getElementById("prev_atd_chk_code").value = row.atd_chk_code;
+            document.getElementById("atd_chk_code").value = row.atd_chk_code;
+          }
+
+          $("#did_user_view").css("display", "none");
+          $("#did_user_view2").css("display", "none");
+          $("#did_atd_gubun").css("display", "none");
+        } else if (row.emp_tp == "04") {
+          $("div[name=emp_user]").hide();
+          $("div[name=emp_pay]").hide();
+          $("div[name=emp_did]").show();
+          $("input:radio[name='kiosk_atd_gb']:radio[value='" + row.kiosk_atd_gb + "']").prop("checked", true);
+          $("#kiosk_atd_room_no").val(row.kiosk_atd_room_no);
+
+          var kiosk_atd_chk_tp = row.kiosk_atd_chk_tp;
+          var kioskTp = kiosk_atd_chk_tp.split(",");
+
+          $("#did_user_view").show();
+          $("#did_user_view2").show();
+          $("#did_atd_gubun").show();
+
+          if (kioskTp[0] == "Y") $("#kiosk_atd_chk_tp1").prop("checked", true);
+          if (kioskTp[1] == "Y") $("#kiosk_atd_chk_tp2").prop("checked", true);
+        } else {
+          $("div[name=emp_did]").hide();
+          $("div[name=emp_user]").show();
+
+          if (bossYn == "Y") {
+            $("div[name=emp_pay]").show();
+          } else {
+            $("div[name=emp_pay]").hide();
+          }
+
+          $("#did_user_view").css("display", "none");
+          $("#did_user_view2").css("display", "none");
+          $("#did_atd_gubun").css("display", "none");
+        }
+
+        $("input:radio[name='emp_use_yn']").prop("checked", false);
+        $("input:radio[name='emp_use_yn'][value='" + row.emp_use_yn + "']").prop("checked", true);
+
+        $("#sal_base_amt").val(addComma(row.sal_base_amt));
+        $("#sal_spc_amt").val(addComma(row.sal_spc_amt));
+        $("#sal_insen_per_amt").val(addComma(row.sal_insen_per_amt));
+        tbl_cnct_log_list.ajax.reload();
+        if (session_aca_id == "AC00001") {
+          if (row.emp_aca_id == "AC00001") {
+            $("#emp_dept_frm_group").show();
+            $("#emp_p_auth_frm").show();
+            $("#emp_aca_auth_frm").hide();
+
+            var auth_grp_cd = row.emp_auth_grp_cd.split(",");
+            if (auth_grp_cd.length > 0) {
+              $("#emp_p_auth_grp_cd").val(auth_grp_cd);
+            } else {
+              $("#emp_p_auth_grp_cd").val("");
+            }
+
+            $("#emp_p_auth_grp_cd").trigger("change");
+          } else {
+            $("#emp_dept_frm_group").hide();
+            $("#emp_p_auth_frm").hide();
+            $("#emp_aca_auth_frm").show();
+
+            var auth_grp_cd = row.emp_auth_grp_cd.split(",");
+            if (auth_grp_cd.length > 0) {
+              $("#emp_auth_grp_cd").val(auth_grp_cd);
+            } else {
+              $("#emp_auth_grp_cd").val("");
+            }
+
+            $("#emp_auth_grp_cd").trigger("change");
+          }
+        } else {
+          var auth_grp_cd = row.emp_auth_grp_cd.split(",");
+          if (auth_grp_cd.length > 0) {
+            $("#emp_auth_grp_cd").val(auth_grp_cd);
+          } else {
+            $("#emp_auth_grp_cd").val("");
+          }
+
+          $("#emp_auth_grp_cd").trigger("change");
+        }
+
+        var dept = row.emp_dept.split(",");
+        if (dept.length > 0) {
+          $("#emp_dept").val(dept);
+        } else {
+          $("#emp_dept").val("");
+        }
+
+        $("#emp_dept").trigger("change");
+
+        var work_cd = row.emp_work_cd.split(",");
+        if (work_cd.length > 0) {
+          $("#emp_work_cd").val(work_cd);
+        } else {
+          $("#emp_work_cd").val("");
+        }
+
+        $("#emp_work_cd").trigger("change");
+
+        $("#btn_emp_create").hide();
+        $("#btn_emp_update").show();
+
+        $("#emp_aca_id").attr("disabled", "disabled");
+
+        if (row.img_url) {
+          $(".imagePreview").css("background-image", "url(" + row.img_url + ")");
+        } else {
+          $(".imagePreview").css("background-image", "url(" + no_img_path + ")");
+        }
+      });
+      $("#srch_tp_inp").keypress(function (e) {
+        if (e.keyCode && e.keyCode == 13) {
+          $("#btn_user_srch").trigger("click");
+          return false;
+        }
+      });
+      $("#srch_tp").change(function () {
+        if ($(this).val() == "") {
+          $("#srch_tp_inp").val("");
+        }
+      });
+      $("#btn_dup_cnfm").click(function () {
+        if ($("#user_id").val() == "") {
+          swal("경고", "아이디를 입력해주십시오.", "error");
+        } else {
+          callAjax("/center/user/userMng/checkUserId", "user_id=" + $("#user_id").val(), fn_return_usid);
+        }
+      });
+      $("#btn_gr_update").click(function () {
+        if ($("#open_updt_gb").val() == "create") {
+          if ($("#hd_dup_cnfm").val() == "Y") {
+            if (fn_check_valid($("#user_pswd_new"), $("#user_pswd_new").val(), $("#msg_pswd")) == 1) return;
+            if (fn_check_passWord($("#user_pswd_new"), $("#user_pswd_new_cnfm"), $("#msg_pswd_cnfm")) == 1) return;
+          } else {
+            swal("경고", "중복확인을 해주세요.", "error");
+            return;
+          }
+        } else if ($("#open_updt_gb").val() == "update") {
+          // 비밀번호 변경추가 (비밀번호를 변경할때만 체크)
+          if ($("#user_ch_pswd_new").val() != "") {
+            if (fn_check_valid($("#user_ch_pswd_new"), $("#user_ch_pswd_new").val(), $("#msg_ch_pswd")) == 1) return;
+            if (fn_check_passWord($("#user_ch_pswd_new"), $("#user_ch_pswd_new_cnfm"), $("#msg_ch_pswd_cnfm")) == 1) return;
+          }
+        }
+
+        if ($("#open_updt_gb").val() == "create") {
+          ConfirmdialogToAjax("create", "/center/user/userMng/userCreate", $("#frm_user_info").serialize(), fn_return_user_create);
+        } else {
+          ConfirmdialogToAjax("update", "/center/user/userMng/userUpdate", $("#frm_user_info").serialize(), fn_return_user_create);
+        }
+      });
+      $("#btn_emp_clear").click(function () {
+        $("#frm_emp_info").clearForm();
+        $("input:radio[name=pt_status]:input[value='Y']").prop("checked", true);
+        $("input:radio[name='emp_use_yn']:input[value='Y']").prop("checked", true);
+
+        $("#emp_p_auth_grp_cd").val("");
+        $("#emp_auth_grp_cd").val("");
+        $("#emp_dept").val("");
+        $("#emp_work_cd").val("");
+
+        $("#emp_p_auth_grp_cd").trigger("change");
+        $("#emp_auth_grp_cd").trigger("change");
+        $("#emp_dept").trigger("change");
+        $("#emp_work_cd").trigger("change");
+
+        $("div[name=emp_did]").hide();
+        $("div[name=emp_user]").show();
+        $("div[name=live_teach]").show();
+
+        if (bossYn == "Y") {
+          $("div[name=emp_pay]").show();
+        } else {
+          $("div[name=emp_pay]").hide();
+        }
+
+        if (session_aca_id == "AC00001") {
+          $("#emp_dept_frm_group").show();
+          $("#emp_p_auth_frm").show();
+          $("#emp_aca_auth_frm").hide();
+        }
+        $("#btn_emp_create").show();
+        $("#btn_emp_update").hide();
+        $("#emp_aca_id").removeAttr("disabled");
+      });
+      $("#btn_emp_create").click(function () {
+        $("#emp_state").val("create");
+        $("#frm_emp_info").attr("action", "/center/user/empMng/empCreate");
+        //$("#frm_emp_info").submit();
+        let displayChk = $("div[name=atd_chk_code_div]").css("display");
+        let atdChkCodeClsNm = $("#btn_atdChk").attr("class");
+
+        if ($("#emp_tp").val() == "") {
+          swal("경고", "직원유형을 선택해 주세요.", "error");
+          return;
+        }
+
+        if ($("#emp_user_nm").val() == "") {
+          swal("경고", "직원명을 입력해 주세요.", "error");
+          return;
+        }
+
+        if ($("#emp_user_id").val() == "") {
+          swal("경고", "아이디를 입력해 주세요.", "error");
+          return;
+        }
+
+        if ($("#emp_user_pwd").val() == "") {
+          swal("경고", "비밀번호를 입력해 주세요.", "error");
+          return;
+        }
+
+        if ($("#emp_user_pwd").val().length < 7) {
+          swal("경고", "패스워드는 7자 이상 입력해주세요.", "error");
+          return;
+        }
+        if ($("#emp_use_yn").val() == "") {
+          swal("경고", "사용여부를 선택해 주세요.", "error");
+          return;
+        }
+        ConfirmdialogToAjax("create", "/center/user/empMng/empCreate", $("#frm_emp_info").serialize(), function (data) {
+          if (data.resultCode == "S000") {
+            swal("성공", "작업을 정상적으로 완료하였습니다.", "success");
+            $("#btn_emp_clear").trigger("click");
+            tbl_emp_list.ajax.reload(null, true);
+          } else {
+            swal("경고", "저장에 실패하였습니다.", "error");
+          }
+        });
+      });
+
+      $("#btn_emp_update").click(function () {
+        $("#emp_state").val("update");
+        $("#frm_emp_info").attr("action", "/center/user/empMng/empUpdate");
+        //$("#frm_emp_info").submit();
+        let displayChk = $("div[name=atd_chk_code_div]").css("display");
+        let atdChkCodeClsNm = $("#btn_atdChk").attr("class");
+
+        if ($("#emp_tp").val() == "") {
+          swal("경고", "직원유형을 선택해 주세요.", "error");
+          return;
+        }
+
+        if ($("#emp_user_nm").val() == "") {
+          swal("경고", "직원명을 입력해 주세요.", "error");
+          return;
+        }
+
+        if ($("#emp_user_id").val() == "") {
+          swal("경고", "아이디를 입력해 주세요.", "error");
+          return;
+        }
+        if ($("#emp_use_yn").val() == "") {
+          swal("경고", "사용여부를 선택해 주세요.", "error");
+          return;
+        }
+        ConfirmdialogToAjax("update", "/center/user/empMng/empUpdate", $("#frm_emp_info").serialize(), function (data) {
+          if (data.resultCode == "S000") {
+            swal("성공", "작업을 정상적으로 완료하였습니다.", "success");
+            $("#btn_emp_clear").trigger("click");
+            tbl_emp_list.ajax.reload(null, false);
+          } else {
+            swal("경고", "저장에 실패하였습니다.", "error");
+          }
+        });
+      });
+    });
+  </script>
+  <div class="content">
+    <div class="row g-0">
+      <div class="col-lg-8 pe-lg-2 mb-3">
+        <div class="card">
+          <div class="card-header py-2"><h5>직원 리스트</h5></div>
+          <div class="card-body bg-body-tertiary">
+            <div class="row px-3 py-0">
+              <form id="frm_emp_srch" name="frm_emp_srch">
+                <input type="hidden" name="startDate" id="startDate" />
+                <input type="hidden" name="endDate" id="endDate" />
+                <input type="hidden" id="s_aca_id" name="s_aca_id" th:value="${session.S_USER.aca_id}" />
+                <input type="hidden" id="s_aca_nm" name="s_aca_nm" th:value="${session.S_USER.aca_nm}" />
+                <input type="hidden" id="s_mig_a_code" name="s_mig_a_code" th:value="${session.S_USER.mig_a_code}" />
+                <th:block th:switch="${session.S_USER.aca_id}">
+                  <th:block th:case="'AC00001'">
+                    <div class="row px-3 py-0">
+                      <label class="col-md-1 col-form-label col-form-label-sm px-0">사용여부</label>
+                      <div class="col-md-3">
+                        <select class="form-control form-select form-select-sm" name="srch_use_yn" id="srch_use_yn">
+                          <option value="">전체</option>
+                          <option value="Y">사용</option>
+                          <option value="N">미사용</option>
+                        </select>
+                      </div>
+                      <label class="col-md-1 col-form-label col-form-label-sm px-0">소속캠퍼스</label>
+                      <div class="col-md-3">
+                        <select class="form-control form-select form-select-sm" name="srch_center" id="srch_center"></select>
+                      </div>
+                      <div class="col-md-4">
+                        <div class="input-group input-group-sm" style="padding-left: 0px">
+                          <span class="input-group-btn">
+                            <select class="form-control form-select form-select-sm" id="srch_tp" name="srch_tp">
+                              <option value="">검색구분</option>
+                              <option value="name_tp">성명</option>
+                              <option value="usid_tp">회원ID</option>
+                            </select>
+                          </span>
+                          <input type="text" class="form-control form-control-sm" id="srch_tp_inp" name="srch_tp_inp" />
+                          <span class="input-group-btn"><button type="button" class="btn btn-primary btn-sm" id="btn_user_srch" name="btn_user_srch">조회</button></span>
+                        </div>
+                      </div>
+                    </div>
+                  </th:block>
+                  <th:block th:case="*">
+                    <div class="row px-3 py-0">
+                      <label class="col-md-1 col-form-label col-form-label-sm px-0">사용여부</label>
+                      <div class="col-md-3">
+                        <select class="form-control form-select form-select-sm" name="srch_use_yn" id="srch_use_yn">
+                          <option value="">전체</option>
+                          <option value="Y">사용</option>
+                          <option value="N">미사용</option>
+                        </select>
+                      </div>
+                      <div class="col-md-8">
+                        <div class="input-group input-group-sm" style="padding-left: 0px">
+                          <span class="input-group-btn">
+                            <select class="form-control form-select form-select-sm" id="srch_tp" name="srch_tp">
+                              <option value="">검색구분</option>
+                              <option value="name_tp">성명</option>
+                              <option value="usid_tp">회원ID</option>
+                            </select>
+                          </span>
+                          <input type="text" class="form-control form-control-sm" id="srch_tp_inp" name="srch_tp_inp" />
+                          <span class="input-group-btn"><button type="button" class="btn btn-primary btn-sm" id="btn_user_srch" name="btn_user_srch">조회</button></span>
+                        </div>
+                      </div>
+                    </div>
+                  </th:block>
+                </th:block>
+                <hr />
+                <table class="table table-sm table-striped table-bordered table-hover fs-10 mb-0" id="tbl_emp_list">
+                  <thead class="bg-200">
+                    <tr>
+                      <th class="text-900">직원명</th>
+                      <th class="text-900">아이디</th>
+                      <th class="text-900">연락처</th>
+                      <th class="text-900">상태</th>
+                      <th class="text-900">권한</th>
+                      <th class="text-900">등록자</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-body bg-body-tertiary">
+            <table class="table table-sm table-striped table-bordered table-hover fs-10 mb-0" id="tbl_cnct_log_list">
+              <thead class="bg-200">
+                <tr>
+                  <th class="text-900">IP</th>
+                  <th class="text-900">접속일시</th>
+                  <th class="text-900">성공여부</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4 pe-lg-2 mb-3">
+        <div class="card">
+          <div class="card-header py-2"><h5>직원 정보</h5></div>
+          <div class="card-body bg-body-tertiary">
+            <form class="needs-validation" id="frm_emp_info" name="frm_emp_info" onsubmit="return false;" novalidate>
+              <input type="hidden" id="aca_id" name="aca_id" th:value="${session.S_USER.aca_id}" />
+              <input type="hidden" id="emp_state" name="emp_state" value="" />
+              <input type="hidden" id="emp_user_gb_cd" name="emp_user_gb_cd" value="01" />
+              <input type="hidden" id="emp_zip_code" name="emp_zip_code" value="" />
+              <input type="hidden" id="open_updt_gb" value="create" />
+              <input type="hidden" id="hd_dup_cnfm" value="N" />
+
+              <th:block th:if="${session.S_USER.aca_id eq 'AC00001'}">
+                <div class="row py-1">
+                  <label class="col-md-3 col-form-label col-form-label-sm text-end">캠퍼스</label>
+                  <div class="col-md-9">
+                    <select class="form-control form-select form-select-sm" name="emp_aca_id" id="emp_aca_id" onchange="fn_emp_aca_id_onchange(this);"></select>
+                  </div>
+                </div>
+              </th:block>
+              <div class="col-md-12 emp_mng_cont">
+                <div class="row py-1">
+                  <label class="col-md-3 col-form-label col-form-label-sm text-end">직원유형</label>
+                  <div class="col-md-7">
+                    <select class="form-control form-control-sm" name="emp_tp" id="emp_tp" onchange="fn_emp_tp_onchange(this);fn_emp_auth_grp_cdChange('html')" style="width: 205px"></select>
+                  </div>
+                </div>
+                <div class="row py-1">
+                  <label class="col-md-3 col-form-label col-form-label-sm text-end">직원명</label>
+                  <div class="col-md-7">
+                    <input type="text" class="form-control form-control-sm" name="emp_user_nm" id="emp_user_nm" style="width: 205px" />
+                  </div>
+                </div>
+                <div class="row py-1">
+                  <label class="col-md-3 col-form-label col-form-label-sm text-end">아이디</label>
+                  <div class="col-md-7">
+                    <div class="input-group input-group-sm">
+                      <input type="text" class="form-control form-control-sm" name="emp_user_id" id="emp_user_id" style="width: 120px" />
+                      <span class="error" id="msg_usid" style="display: none; color: #cc5965"></span>
+                      <div class="input-group-btn">
+                        <button type="button" class="btn btn-primary btn-sm" id="btn_dup_cnfm"><i class="fa fa-check"></i> <strong>중복확인</strong></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="row py-1">
+                  <label class="col-md-3 col-form-label col-form-label-sm text-end">패스워드</label>
+                  <div class="col-md-7">
+                    <input type="password" class="form-control form-control-sm" name="emp_user_pwd" id="emp_user_pwd" style="width: 205px" />
+                  </div>
+                </div>
+                <div class="row py-1" name="emp_user">
+                  <label class="col-md-3 col-form-label col-form-label-sm text-end">전화번호</label>
+                  <div class="col-md-7">
+                    <input type="text" class="form-control form-control-sm" name="emp_tel_no" id="emp_tel_no" istyle="phone" maxlength="13" style="width: 173px" />
+                  </div>
+                </div>
+                <div class="row py-1" name="emp_user">
+                  <label class="col-md-3 col-form-label col-form-label-sm text-end">Mobile</label>
+                  <div class="col-md-7">
+                    <input type="text" class="form-control form-control-sm" name="emp_hp_no" id="emp_hp_no" istyle="phone" maxlength="13" style="width: 173px" />
+                  </div>
+                </div>
+              </div>
+              <div class="row py-1" name="emp_user">
+                <label class="col-md-3 col-form-label col-form-label-sm text-end">이메일</label>
+                <div class="col-md-7">
+                  <input type="text" class="form-control form-control-sm" id="emp_email" name="emp_email" istyle="email" />
+                </div>
+              </div>
+              <div class="row py-1" name="emp_user">
+                <label class="col-md-3 col-form-label col-form-label-sm text-end">주소</label>
+                <div class="col-md-7">
+                  <input type="text" class="form-control form-control-sm" id="emp_addr" name="emp_addr" readonly="readonly" onclick="openZipSearch();" />
+                </div>
+              </div>
+              <div class="row py-1" name="emp_user">
+                <label class="col-md-3 col-form-label col-form-label-sm text-end"></label>
+                <div class="col-md-7">
+                  <input type="text" class="form-control form-control-sm" id="emp_addr_dtl" name="emp_addr_dtl" />
+                </div>
+              </div>
+
+              <div class="row py-1" id="emp_p_auth_frm" style="display: none">
+                <label class="col-md-3 col-form-label col-form-label-sm text-end">권한</label>
+                <div class="col-md-7">
+                  <select multiple="multiple" class="form-select selectpicker" name="emp_auth_grp_cd" id="emp_p_auth_grp_cd"></select>
+                </div>
+              </div>
+              <div class="row py-1" id="emp_aca_auth_frm">
+                <label class="col-md-3 col-form-label col-form-label-sm text-end">권한</label>
+                <div class="col-md-7">
+                  <select multiple="multiple" class="form-select selectpicker authChk" name="emp_auth_grp_cd" id="emp_auth_grp_cd" onchange="fn_emp_auth_grp_cdChange('html')"></select>
+                </div>
+              </div>
+              <div class="row py-1" name="emp_user">
+                <label class="col-md-3 col-form-label col-form-label-sm text-end">담당업무</label>
+                <div class="col-md-7">
+                  <select multiple="multiple" class="form-select selectpicker authChk" name="emp_work_cd" id="emp_work_cd" onchange="fn_emp_auth_grp_cdChange('html')"></select>
+                </div>
+              </div>
+              <div class="row py-1" name="emp_user">
+                <label class="col-md-3 col-form-label col-form-label-sm text-end">직책</label>
+                <div class="col-md-7">
+                  <input type="text" class="form-control form-control-sm" name="emp_work_lvl" id="emp_work_lvl" />
+                </div>
+              </div>
+              <div class="row py-1" id="emp_dept_frm_group" style="display: none">
+                <label class="col-md-3 col-form-label col-form-label-sm text-end">부서</label>
+                <div class="col-md-7">
+                  <select multiple="multiple" class="form-select selectpicker" name="emp_dept" id="emp_dept"></select>
+                </div>
+              </div>
+              <div class="row py-1" name="emp_user">
+                <label class="col-md-3 col-form-label col-form-label-sm text-end">특이사항</label>
+                <div class="col-md-7">
+                  <input type="text" class="form-control form-control-sm" id="emp_memo" name="emp_memo" />
+                </div>
+              </div>
+              <div class="row py-1">
+                <label class="col-md-3 col-form-label col-form-label-sm text-end">사용여부</label>
+                <div class="col-md-7">
+                  <label class="radio radio-inline">
+                    <input type="radio" class="radiobox" name="emp_use_yn" value="Y" checked />
+                    <span>사용</span>
+                  </label>
+                  <label class="radio radio-inline">
+                    <input type="radio" class="radiobox" name="emp_use_yn" value="N" />
+                    <span>미사용</span>
+                  </label>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="card-footer">
+            <div class="row py-0">
+              <div class="col-md-12 text-end">
+                <button class="btn btn-primary btn-sm" id="btn_emp_clear"><i class="fa fa-check"></i> <strong>신규</strong></button>
+                <button class="btn btn-info btn-sm" id="btn_emp_update" style="display: none"><i class="fa fa-paste"></i> <strong>저장</strong></button>
+                <button class="btn btn-info btn-sm" id="btn_emp_create"><i class="fa fa-paste"></i> <strong>저장</strong></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</html>

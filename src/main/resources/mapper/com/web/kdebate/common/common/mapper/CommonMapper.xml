@@ -1,0 +1,2901 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.web.kdebate.common.common.mapper.CommonMapper">
+	
+	<select id="getQueryTotalCnt" resultType="int">
+		SELECT FOUND_ROWS()
+	</select>
+
+	<select id="getCodeList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT CODE AS "code", CODE_NM AS "codeNm", CODE_GRP_CD AS "group_code"
+  		  FROM TB_CODE
+ 		 WHERE CODE_GRP_CD = #{CODE_GRP_CD}
+   		   AND USE_YN = 'Y'
+   		   AND CODE !='CODE'
+   		<if test="CHK_CD1 != null">
+	 		AND CHK_CD1 = #{CHK_CD1}
+	 	</if>
+	  ORDER BY ORD_NO
+	</select>
+	<select id="chkAuthRetrieve" parameterType="java.util.HashMap" resultType="int">
+		SELECT COUNT(*)
+		  FROM TB_MENU A
+		 INNER JOIN TB_AUTH_GRP_MENU B ON (B.MENU_CD = A.MENU_CD AND AUTH_GRP_CD IN <foreach item="item" index="index" collection="user_group" open="(" separator="," close=")">#{item}</foreach> )
+		  							  AND B.SITE_GB_CD = 'SG0001'
+		  LEFT JOIN TB_USER_TP_AUTH_GRP C ON C.AUTH_GRP_CD IN <foreach item="item" index="index" collection="user_group" open="(" separator="," close=")">#{item}</foreach> AND C.AUTH_GRP_CD = B.AUTH_GRP_CD
+		 WHERE A.USE_YN = 'Y'
+		   AND A.MENU_URL = #{url}
+		   AND A.SITE_GB_CD = 'SG0001'
+	</select>
+
+	<select id="getTotalCodelist" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT CODE AS "code"
+			 , CODE_NM AS "codeNm"
+			 , CODE_GRP_CD AS "group_code"
+			 , CHK_CD1 AS "chk_cd1"
+			 , CHK_CD2 AS "chk_cd2"
+  		  FROM TB_CODE
+ 		 WHERE CODE_GRP_CD IN ${CODE_GRP_CD}
+   		   AND USE_YN = 'Y'
+   		   AND CODE !='CODE'
+	  ORDER BY CODE_GRP_CD, ORD_NO
+	</select>
+
+	<select id="centerListRetrieve" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	/* CommonMapper.centerListRetrieve */
+		SELECT TA.ACA_ID as aca_id
+			, TA.ACA_NM as aca_nm
+			, TA.PCODE_USE_YN as pcode_use_yn
+		FROM TB_ACA TA
+		<if test='p_aca_id != null and p_aca_id != ""'>
+		JOIN VW_MY_ACA_LIST MAL ON MAL.ACA_ID = TA.ACA_ID
+								AND MAL.MY_ACA_ID = #{aca_id}
+		</if>
+		WHERE 1=1
+		<if test='auth_grp_cd == "AG0102"'>
+       		AND EXISTS (
+				SELECT 	1 
+				  FROM 	TB_CLASS_TIME_TABLE CTT
+						JOIN TB_CLASS_STD TCS ON TCS.CLASS_CD= CTT.CLASS_CD
+				 WHERE 	(CTT.TEACHER_ID = #{userId}
+						OR
+						CTT.TEACHER_ID2 = #{userId}
+						)
+				   AND	TCS.STD_ID = TSI.STD_ID
+				)
+       </if>
+		AND TA.USE_YN = 'Y'
+		ORDER BY CASE WHEN TA.ACA_ID = #{aca_id} THEN 0 ELSE TA.ACA_ID END, TA.ACA_NM
+	</select>
+
+	<select id="commStdListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CommonMapper.commStdListRetrieve */
+	SELECT TSI.STD_ID AS std_id
+         , TSI.ACA_ID AS aca_id
+         , TA.ACA_NM  AS aca_nm
+         , TSI.STD_NM AS std_nm
+         , IFNULL(TSI.STD_GB_TXT, '') AS std_gb_txt
+         , IFNULL(TSI.SCH_NM, '') AS sch_nm
+         , CASE WHEN IFNULL(TSI.SCH_LVL, '') = '' THEN '' ELSE FC_GET_CODE_NM('SCH_LVL', TSI.SCH_LVL) END AS sch_lvl_nm
+	  FROM TB_STD_INFO TSI
+		JOIN (	
+					SELECT 	DISTINCT STD_ID
+					FROM 	(
+								SELECT  'S' AS GB, TU.USER_ID	AS STD_ID
+								FROM 	TB_USER TU
+								WHERE	( 
+											(USER_NM LIKE CONCAT('%', #{std_view_list}, '%'))
+											OR
+											(REPLACE(HP_NO, '-', '')  LIKE CONCAT('%', #{std_view_list}, '%'))
+										)
+								AND	USER_GB_CD = '02'        
+								UNION 	ALL
+								SELECT  'P' AS GB, TP.STD_ID
+								FROM 	TB_USER TU
+										JOIN TB_PARENTS TP ON TP.PARENT_ID = TU.USER_ID
+								WHERE	( 
+											(USER_NM LIKE CONCAT('%', #{std_view_list}, '%'))
+											OR
+											(REPLACE(HP_NO, '-', '') LIKE CONCAT('%', #{std_view_list}, '%'))
+										)
+								AND	USER_GB_CD = '03'        
+							) V
+				) VST ON VST.STD_ID = TSI.STD_ID
+	  <if test='p_aca_id != null and p_aca_id != ""'>
+	  	 JOIN VW_MY_ACA_LIST MAL ON MAL.ACA_ID = TSI.ACA_ID
+							  AND MAL.MY_ACA_ID = #{acaID}
+	  </if>
+      LEFT JOIN TB_ACA TA
+	  		ON TA.ACA_ID = TSI.ACA_ID
+       <if test='auth_grp_cd == "AG0102"'>
+       		AND EXISTS (
+				SELECT 	1 
+				  FROM 	TB_CLASS_TIME_TABLE CTT
+						JOIN TB_CLASS_STD TCS ON TCS.CLASS_CD= CTT.CLASS_CD
+				 WHERE 	(CTT.TEACHER_ID = #{userId}
+						OR
+						CTT.TEACHER_ID2 = #{userId}
+						)
+				   AND	TCS.STD_ID = TSI.STD_ID
+				)
+       </if>
+	   LEFT JOIN TB_USER TU ON TU.USER_ID = TSI.STD_ID
+      ORDER BY CASE WHEN TSI.ACA_ID = #{acaID} THEN 0 ELSE TA.ACA_NM END, TSI.STD_NM ASC
+	</select>
+
+	<select id="pacaCheck" parameterType="hashMap" resultType="string">
+		SELECT CASE WHEN P_ACA_ID IS NULL OR P_ACA_ID = 'null' THEN 'Y' ELSE 'N' END
+          FROM TB_ACA
+         WHERE aca_id =#{acaID}
+	</select>
+
+
+
+	<insert id="setSmsListInsert" parameterType="com.web.kdebate.common.common.domain.SmsInfoVO">
+		INSERT INTO TB_SMS
+            (RESERVED_DATE
+             , MT_TYPE
+             , PHONE_NUMBER
+             , CALLBACK
+             , TITLE
+             , MESSAGE
+             , RETUNR_SEQ
+             , REQUEST_DATE
+             , RESPONSE_DATE
+             , RESPONSE_CODE
+             , REPORT_TYPE
+             , REPORT_DATE
+             , REPORT_CODE
+             , ARRIVAL_DATE
+             , ACA_ID
+             , STD_ID
+             , ENT_USER_ID
+             , STATUS
+             , SMS_CONT_TP)
+		VALUES (  #{reserved_date}
+		        , #{mt_type}
+		        , #{phone_number}
+		        , #{callback}
+		        , #{title}
+		        , #{message}
+		        , #{retunr_seq}
+		        , DATE_FORMAT(NOW(), '%Y-%m-%d')
+		        , #{response_date}
+		        , #{response_code}
+		        , #{report_type}
+		        , #{report_date}
+		        , #{report_code}
+		        , #{arrival_date}
+		        , #{aca_id}
+		        , #{std_id}
+		        , #{ent_user_id}
+		        , #{status}
+		        , #{sms_cont_tp})
+
+	</insert>
+	<select id="getAcaTelnoRetrieve" parameterType="string" resultType="string">
+		SELECT TEL_NO AS tel_no
+		  FROM TB_ACA
+		 WHERE ACA_ID= #{aca_id}
+	</select>
+
+	<select id="getAchievementTestTotalCnt" parameterType="hashMap" resultType="int">
+		SELECT
+		    COUNT(1)
+		FROM
+		    tblAT_paper T1
+		WHERE T1.strGrade = #{grade_1}
+		AND T1.strCourse = #{grade_2}
+		AND T1.acode = CONCAT('TEST', #{step})
+		AND T1.del_yn = 'N'
+		AND T1.total != 0
+	</select>
+
+	<select id="getAchievementTestRankCnt" parameterType="hashMap" resultType="int">
+		SELECT
+		    COUNT(1)
+		FROM
+		    tblAT_paper T1
+		WHERE T1.strGrade = #{grade_1}
+		AND T1.strCourse = #{grade_2}
+		AND T1.acode = CONCAT('TEST', #{step})
+		AND T1.del_yn = 'N'
+		AND T1.total <![CDATA[>]]> CAST((SELECT total
+										 FROM tblAT_paper
+										 WHERE students_no = #{students_no}
+										 AND strGrade = #{grade_1}
+										 AND strCourse = #{grade_2}
+										 AND acode = CONCAT('TEST',#{step})
+										 AND del_yn = 'N') AS UNSIGNED )
+	</select>
+
+	<select id="getAchievementTestInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T3.ACA_NM as aca_nm
+		     , T2.STD_NM as std_nm
+		     , T1.strSubject as strSubject
+		     , CONCAT(T1.strGrade, T1.strCourse, '(', T1.acode, ')') as subject
+		     , (SELECT ROUND(AVG(total)) FROM tblAT_paper WHERE strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST', #{step}) AND del_yn = 'N' AND total IS NOT NULL) as avg_score
+		     , T1.Total as total_score
+		     , TIMEDIFF(DATE_FORMAT(T1.end_date, '%h:%i:%s'), DATE_FORMAT(T1.start_date, '%h:%i:%s')) as total_time
+		FROM tblAT_paper T1
+		JOIN TB_STD_INFO T2 ON T2.LINK_STDNO = T1.students_no
+		JOIN TB_ACA T3 ON T3.ACA_ID = T2.ACA_ID
+		WHERE strGrade = #{grade_1}
+		AND strCourse = #{grade_2}
+		AND acode = CONCAT('TEST', #{step})
+		AND del_yn = 'N'
+		AND STUDENTS_NO = #{students_no}
+		AND total IS NOT NULL
+	</select>
+
+	<select id="getAchievementTestListRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT A.Question_no as question_no
+		     , A.Type_a as type_a
+		     , A.Type_b as type_b
+		     , A.lang_eng as lang_eng
+		     , A.lang_kor as lang_kor
+		     , A.Correct_answer as correct_answer
+		     , B.answer as answer
+		     , CASE WHEN A.Correct_answer = B.answer THEN 'O'
+			 	    ELSE 'X' END as result
+		FROM RS_GT_Achievement_Test_FORM A
+		JOIN (SELECT (@rownum:=@rownum+1) as "Question_no"
+				   , T1.answer
+			  FROM (SELECT t01 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t02 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t03 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t04 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t05 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t06 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t07 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t08 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t09 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t10 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t11 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t12 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t13 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t14 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t15 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t16 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t17 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t18 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t19 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step}) UNION ALL
+		 			SELECT t20 AS answer FROM tblAT_paper WHERE students_no = #{students_no} AND strGrade = #{grade_1} AND strCourse = #{grade_2} AND acode = CONCAT('TEST',#{step})
+				   ) T1, (SELECT @rownum:=0) RNUM) B ON B.Question_no = A.Question_no
+		WHERE A.Test_Grade = CONCAT(#{grade_1},#{grade_2})
+		AND A.Step = #{step}
+	</select>
+
+	<select id="getCurriWordInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+			 , FORMAT(@rownum:=@rownum + +1, 0) as row_num
+			 , T2.str_eng as str_eng
+			 , T2.str_exs as str_exs
+			 , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.native_file as native_file
+			 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.try_num, '_', @rownum), '_', -1) AS try_num
+	 		 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.result, '_', @rownum), '_', -1) AS result
+	 		 , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_CURRI T1
+		JOIN RS_STUDY_WORD_CONENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.grade_1 = T1.GRADE_1 AND T2.grade_2 = T1.GRADE_2 AND T2.section = T1.SECTION AND content_type = 'basic'
+		, (SELECT @rownum:=0) T3
+		WHERE T1.INTNO = #{int_no}
+	</select>
+
+	<select id="getFreeWordInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+			 , FORMAT(@rownum:=@rownum + +1, 0) as row_num
+			 , T2.str_eng as str_eng
+			 , T2.str_exs as str_exs
+			 , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.native_file as native_file
+			 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.try_num, '_', @rownum), '_', -1) AS try_num
+	 		 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.result, '_', @rownum), '_', -1) AS result
+	 		 , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_FREE T1
+		JOIN RS_STUDY_WORD_CONENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.grade_1 = T1.GRADE_1 AND T2.grade_2 = T1.GRADE_2 AND T2.section = T1.SECTION AND content_type = 'basic'
+		, (SELECT @rownum:=0) T3
+		WHERE T1.INTNO = #{int_no}
+	</select>
+
+	<select id="getHomeworkWordInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+			 , FORMAT(@rownum:=@rownum + +1, 0) as row_num
+			 , T2.str_eng as str_eng
+			 , T2.str_exs as str_exs
+			 , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.native_file as native_file
+			 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.try_num, '_', @rownum), '_', -1) AS try_num
+	 		 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.result, '_', @rownum), '_', -1) AS result
+	 		 , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_HOMEWORK T1
+		JOIN RS_STUDY_WORD_CONENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.grade_1 = T1.GRADE_1 AND T2.grade_2 = T1.GRADE_2 AND T2.section = T1.SECTION AND content_type = 'basic'
+		, (SELECT @rownum:=0) T3
+		WHERE T1.INTNO = #{int_no}
+	</select>
+
+	<select id="getCurriSentenceInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+			 , FORMAT(@rownum:=@rownum + +1, 0) as row_num
+			 , T2.str_eng as str_eng
+			 , T2.str_exs as str_exs
+			 , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.native_file as native_file
+			 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.try_num, '_', @rownum), '_', -1) AS try_num
+	 		 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.result, '_', @rownum), '_', -1) AS result
+	 		 , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_CURRI T1
+		JOIN RS_STUDY_SENTENCE_CONTENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.grade_1 = T1.GRADE_1 AND T2.grade_2 = T1.GRADE_2 AND content_type = 'basic'
+		, (SELECT @rownum:=0) T3
+		WHERE T1.INTNO = #{int_no}
+	</select>
+
+	<select id="getFreeSentenceInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+			 , FORMAT(@rownum:=@rownum + +1, 0) as row_num
+			 , T2.str_eng as str_eng
+			 , T2.str_exs as str_exs
+			 , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.native_file as native_file
+			 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.try_num, '_', @rownum), '_', -1) AS try_num
+	 		 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.result, '_', @rownum), '_', -1) AS result
+	 		 , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_FREE T1
+		JOIN RS_STUDY_SENTENCE_CONTENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.grade_1 = T1.GRADE_1 AND T2.grade_2 = T1.GRADE_2 AND content_type = 'basic'
+		, (SELECT @rownum:=0) T3
+		WHERE T1.INTNO = #{int_no}
+	</select>
+
+	<select id="getHomeworkSentenceInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+			 , FORMAT(@rownum:=@rownum + +1, 0) as row_num
+			 , T2.str_eng as str_eng
+			 , T2.str_exs as str_exs
+			 , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.native_file as native_file
+			 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.try_num, '_', @rownum), '_', -1) AS try_num
+	 		 , SUBSTRING_INDEX(SUBSTRING_INDEX(T1.result, '_', @rownum), '_', -1) AS result
+	 		 , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_HOMEWORK T1
+		JOIN RS_STUDY_SENTENCE_CONTENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.grade_1 = T1.GRADE_1 AND T2.grade_2 = T1.GRADE_2 AND content_type = 'basic'
+		, (SELECT @rownum:=0) T3
+		WHERE T1.INTNO = #{int_no}
+	</select>
+
+	<select id="getCurriDubbingInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+			 , T1.LEARNING_TIME as learning_time
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.SECTION as section
+			 , T2.str_eng as str_eng
+			 , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.location_mp4 as native_file
+			 , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_CURRI T1
+		JOIN RS_STUDY_DUBBING_CONTENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.grade_1 = T1.GRADE_1 AND T2.grade_2 = T1.GRADE_2 AND T2.section = T1.SECTION
+		WHERE T1.INTNO = #{int_no}
+	</select>
+
+	<select id="getFreeDubbingInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+			 , T1.LEARNING_TIME as learning_time
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.SECTION as section
+			 , T2.str_eng as str_eng
+			 , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.location_mp4 as native_file
+			 , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_FREE T1
+		JOIN RS_STUDY_DUBBING_CONTENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.grade_1 = T1.GRADE_1 AND T2.grade_2 = T1.GRADE_2 AND T2.section = T1.SECTION
+		WHERE T1.INTNO = #{int_no}
+	</select>
+
+	<select id="getHomeworkDubbingInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+			 , T1.LEARNING_TIME as learning_time
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.SECTION as section
+			 , T2.str_eng as str_eng
+			 , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+			 , T2.location_mp4 as native_file
+			 , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_HOMEWORK T1
+		JOIN RS_STUDY_DUBBING_CONTENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.grade_1 = T1.GRADE_1 AND T2.grade_2 = T1.GRADE_2 AND T2.section = T1.SECTION
+		WHERE T1.INTNO = #{int_no}
+	</select>
+
+	<select id="getCurriQnaInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+		     , T1.ACTIVITY_NO as activity_no
+		     , T2.str_eng_q as str_eng_q
+		     , T3.contents AS str_eng_a
+		     , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+		     , T2.native_file as native_file
+		     , T3.teacherComment as teacher_comment
+		     , T3.score as score
+		     , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_CURRI T1
+		JOIN RS_STUDY_QNA_CONTENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.section = T1.SECTION AND T2.grade_1 = T1.GRADE_1
+		JOIN RS_GT_QNA_REQUEST_LIST T3 ON T3.student_number = T1.STUDENTS_NO AND T3.Activity_no = T1.ACTIVITY_NO AND T3.section = T1.SECTION
+		WHERE T1.INTNO = #{int_no}
+		GROUP BY T2.native_file
+	</select>
+
+	<select id="getFreeQnaInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+		     , T1.ACTIVITY_NO as activity_no
+		     , T2.str_eng_q as str_eng_q
+		     , T3.contents AS str_eng_a
+		     , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+		     , T2.native_file as native_file
+		     , T3.teacherComment as teacher_comment
+		     , T3.score as score
+		     , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_FREE T1
+		JOIN RS_STUDY_QNA_CONTENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.section = T1.SECTION AND T2.grade_1 = T1.GRADE_1
+		JOIN RS_GT_QNA_REQUEST_LIST T3 ON T3.student_number = T1.STUDENTS_NO AND T3.Activity_no = T1.ACTIVITY_NO AND T3.section = T1.SECTION
+		WHERE T1.INTNO = #{int_no}
+		GROUP BY T2.native_file
+	</select>
+
+	<select id="getHomeworkQnaInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.STUDENTS_NO as students_no
+		     , T1.ACTIVITY_NO as activity_no
+		     , T2.str_eng_q as str_eng_q
+		     , T3.contents AS str_eng_a
+		     , T2.section as section
+			 , T1.ACTIVITY_NO as activity_no
+		     , T2.native_file as native_file
+		     , T3.teacherComment as teacher_comment
+		     , T3.score as score
+		     , DATE_FORMAT(T1.REGDATE, '%Y-%m-%d') as reg_dt
+		FROM RS_GT_SCORE_HOMEWORK T1
+		JOIN RS_STUDY_QNA_CONTENTS T2 ON T2.activity_no = T1.ACTIVITY_NO AND T2.section = T1.SECTION AND T2.grade_1 = T1.GRADE_1
+		JOIN RS_GT_QNA_REQUEST_LIST T3 ON T3.student_number = T1.STUDENTS_NO AND T3.Activity_no = T1.ACTIVITY_NO AND T3.section = T1.SECTION
+		WHERE T1.INTNO = #{int_no}
+		GROUP BY T2.native_file
+	</select>
+
+	<select id="getWdInfoListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CommonMapper.getWdInfoListRetrieve */
+	SELECT *
+	  FROM
+			(SELECT '메인학습' AS tbl_type
+			     , ACTIVITY_NO AS activity_no
+			     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'WW' THEN 'WORD-WRITING'
+			            WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'WS' THEN 'WORD-SPEAKING'
+			            END AS learning_title
+			     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'LIS' THEN 'LISTENING'
+			            WHEN SUBSTR(LEARNING_NAME, 4) = 'SHA' THEN 'SHADOWING'
+			            WHEN SUBSTR(LEARNING_NAME, 4) = 'PRE' THEN 'PRETEST'
+			            WHEN SUBSTR(LEARNING_NAME, 4) = 'TEST' THEN 'TEST'
+			            WHEN SUBSTR(LEARNING_NAME, 4) = 'PRA' THEN 'PRACTICE'
+			            WHEN SUBSTR(LEARNING_NAME, 4) = 'QUIZ' THEN 'QUIZ'
+			            END AS learning_type
+			     , CONCAT(ALPHA, ' Alpha') AS alpha
+			     , IF(MINUTE(SEC_TO_TIME(LEARNING_TIME)) = 0, CONCAT(SECOND(SEC_TO_TIME(LEARNING_TIME)), '초'),
+			       CONCAT(MINUTE(SEC_TO_TIME(LEARNING_TIME)), '분 ', SECOND(SEC_TO_TIME(LEARNING_TIME)), '초')) AS learning_time
+			     , INTNO AS intno
+			     , 'CURRI' AS tbl_name
+			     , REGDATE
+			  FROM RS_GT_SCORE_CURRI
+			 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+			   AND STUDENTS_NO = #{std_id}
+			   AND LEARNING_NAME LIKE CONCAT('W','%')
+			UNION ALL
+				SELECT '메인숙제' AS tbl_type
+				     , ACTIVITY_NO AS activity_no
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'WW' THEN 'WORD-WRITING'
+				            WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'WS' THEN 'WORD-SPEAKING'
+				            END AS learning_title
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'LIS' THEN 'LISTENING'
+				            WHEN SUBSTR(LEARNING_NAME, 4) = 'SHA' THEN 'SHADOWING'
+				            WHEN SUBSTR(LEARNING_NAME, 4) = 'PRE' THEN 'PRETEST'
+				            WHEN SUBSTR(LEARNING_NAME, 4) = 'TEST' THEN 'TEST'
+				            WHEN SUBSTR(LEARNING_NAME, 4) = 'PRA' THEN 'PRACTICE'
+				            WHEN SUBSTR(LEARNING_NAME, 4) = 'QUIZ' THEN 'QUIZ'
+				            END AS learning_type
+				     , CONCAT(ALPHA, ' Alpha') AS alpha
+				     , IF(MINUTE(SEC_TO_TIME(LEARNING_TIME)) = 0, CONCAT(SECOND(SEC_TO_TIME(LEARNING_TIME)), '초'),
+				       CONCAT(MINUTE(SEC_TO_TIME(LEARNING_TIME)), '분 ', SECOND(SEC_TO_TIME(LEARNING_TIME)), '초')) AS learning_time
+				     , INTNO AS intno
+			         , 'HOMEWORK' AS tbl_name
+			         , REGDATE
+				  FROM RS_GT_SCORE_HOMEWORK
+				 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+				   AND STUDENTS_NO = #{std_id}
+				   AND LEARNING_NAME LIKE CONCAT('W','%')
+			UNION ALL
+				SELECT '자유학습' AS tbl_type
+				     , ACTIVITY_NO AS activity_no
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'WW' THEN 'WORD-WRITING'
+				            WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'WS' THEN 'WORD-SPEAKING'
+				            END AS learning_title
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'LIS' THEN 'LISTENING'
+				            WHEN SUBSTR(LEARNING_NAME, 4) = 'SHA' THEN 'SHADOWING'
+				            WHEN SUBSTR(LEARNING_NAME, 4) = 'PRE' THEN 'PRETEST'
+				            WHEN SUBSTR(LEARNING_NAME, 4) = 'TEST' THEN 'TEST'
+				            WHEN SUBSTR(LEARNING_NAME, 4) = 'PRA' THEN 'PRACTICE'
+				            WHEN SUBSTR(LEARNING_NAME, 4) = 'QUIZ' THEN 'QUIZ'
+				            END AS learning_type
+				     , CONCAT(CARAT, ' Carat') AS alpha
+				     , IF(MINUTE(SEC_TO_TIME(LEARNING_TIME)) = 0, CONCAT(SECOND(SEC_TO_TIME(LEARNING_TIME)), '초'),
+				       CONCAT(MINUTE(SEC_TO_TIME(LEARNING_TIME)), '분 ', SECOND(SEC_TO_TIME(LEARNING_TIME)), '초')) AS learning_time
+				     , INTNO AS intno
+			         , 'FREE' AS tbl_name
+			         , REGDATE
+				  FROM RS_GT_SCORE_FREE
+				 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+				   AND STUDENTS_NO = #{std_id}
+				   AND LEARNING_NAME LIKE CONCAT('W','%')) A
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.REGDATE DESC
+       		</otherwise>
+      	</choose>
+	</select>
+
+	<select id="getStInfoListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CommonMapper.getStInfoListRetrieve */
+	SELECT *
+	  FROM
+			(SELECT '메인학습' AS tbl_type
+			     , ACTIVITY_NO AS activity_no
+			     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'SW' THEN 'SENTENCE-WRITING'
+			            WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'SS' THEN 'SENTENCE-SPEAKING'
+			            END AS learning_title
+			     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'PRA' THEN 'PRACTICE'
+			     		WHEN SUBSTR(LEARNING_NAME, 4) = 'SHA' THEN 'SHADOWING'
+			     		WHEN SUBSTR(LEARNING_NAME, 4) = 'PRT' THEN 'PRESENTATION'
+			     		WHEN SUBSTR(LEARNING_NAME, 4) = 'TEST' THEN 'TEST'
+			     		WHEN SUBSTR(LEARNING_NAME, 4) = 'QUIZ' THEN 'QUIZ'
+			            END AS learning_type
+			     , CONCAT(ALPHA, ' Alpha') AS alpha
+			     , IF(MINUTE(SEC_TO_TIME(LEARNING_TIME)) = 0, CONCAT(SECOND(SEC_TO_TIME(LEARNING_TIME)), '초'),
+			       CONCAT(MINUTE(SEC_TO_TIME(LEARNING_TIME)), '분 ', SECOND(SEC_TO_TIME(LEARNING_TIME)), '초')) AS learning_time
+			     , INTNO AS intno
+			     , 'CURRI' AS tbl_name
+			     , REGDATE
+			  FROM RS_GT_SCORE_CURRI
+			 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+			   AND STUDENTS_NO = #{std_id}
+			   AND LEARNING_NAME LIKE CONCAT('S','%')
+			UNION ALL
+				SELECT '메인숙제' AS tbl_type
+				     , ACTIVITY_NO AS activity_no
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'SW' THEN 'SENTENCE-WRITING'
+			            WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'SS' THEN 'SENTENCE-SPEAKING'
+			            END AS learning_title
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'PRA' THEN 'PRACTICE'
+				     		WHEN SUBSTR(LEARNING_NAME, 4) = 'SHA' THEN 'SHADOWING'
+				     		WHEN SUBSTR(LEARNING_NAME, 4) = 'PRT' THEN 'PRESENTATION'
+				     		WHEN SUBSTR(LEARNING_NAME, 4) = 'TEST' THEN 'TEST'
+				     		WHEN SUBSTR(LEARNING_NAME, 4) = 'QUIZ' THEN 'QUIZ'
+				            END AS learning_type
+				     , CONCAT(ALPHA, ' Alpha') AS alpha
+				     , IF(MINUTE(SEC_TO_TIME(LEARNING_TIME)) = 0, CONCAT(SECOND(SEC_TO_TIME(LEARNING_TIME)), '초'),
+				       CONCAT(MINUTE(SEC_TO_TIME(LEARNING_TIME)), '분 ', SECOND(SEC_TO_TIME(LEARNING_TIME)), '초')) AS learning_time
+				     , INTNO AS intno
+			         , 'HOMEWORK' AS tbl_name
+			         , REGDATE
+				  FROM RS_GT_SCORE_HOMEWORK
+				 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+				   AND STUDENTS_NO = #{std_id}
+				   AND LEARNING_NAME LIKE CONCAT('S','%')
+			UNION ALL
+				SELECT '자유학습' AS tbl_type
+				     , ACTIVITY_NO AS activity_no
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'SW' THEN 'SENTENCE-WRITING'
+			            WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'SS' THEN 'SENTENCE-SPEAKING'
+			            END AS learning_title
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'PRA' THEN 'PRACTICE'
+				     		WHEN SUBSTR(LEARNING_NAME, 4) = 'SHA' THEN 'SHADOWING'
+				     		WHEN SUBSTR(LEARNING_NAME, 4) = 'PRT' THEN 'PRESENTATION'
+				     		WHEN SUBSTR(LEARNING_NAME, 4) = 'TEST' THEN 'TEST'
+				     		WHEN SUBSTR(LEARNING_NAME, 4) = 'QUIZ' THEN 'QUIZ'
+				            END AS learning_type
+				     , CONCAT(CARAT, ' Carat') AS alpha
+				     , IF(MINUTE(SEC_TO_TIME(LEARNING_TIME)) = 0, CONCAT(SECOND(SEC_TO_TIME(LEARNING_TIME)), '초'),
+				       CONCAT(MINUTE(SEC_TO_TIME(LEARNING_TIME)), '분 ', SECOND(SEC_TO_TIME(LEARNING_TIME)), '초')) AS learning_time
+				     , INTNO AS intno
+			         , 'FREE' AS tbl_name
+			         , REGDATE
+				  FROM RS_GT_SCORE_FREE
+				 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+				   AND STUDENTS_NO = #{std_id}
+				   AND LEARNING_NAME LIKE CONCAT('S','%')) A
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.REGDATE DESC
+       		</otherwise>
+      	</choose>
+	</select>
+
+	<select id="getDuInfoListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CommonMapper.getDuInfoListRetrieve */
+	SELECT *
+	  FROM
+			(SELECT '메인학습' AS tbl_type
+			     , ACTIVITY_NO AS activity_no
+			     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'DU' THEN 'DUBBING'
+			            END AS learning_title
+			     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'PRA' THEN 'PRACTICE'
+			     		WHEN SUBSTR(LEARNING_NAME, 4) = 'LIVE' THEN 'LIVE'
+			            END AS learning_type
+			     , CONCAT(ALPHA, ' Alpha') AS alpha
+			     , FLOOR((LENGTH(LEARNING_TIME) - LENGTH(REPLACE(LEARNING_TIME, '/', ''))) / LENGTH('/') + 1) AS try_cnt
+			     , IF(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))) = 0, CONCAT(SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초'),
+			       CONCAT(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '분 ', SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초')) AS learning_time
+			     , INTNO AS intno
+			     , 'CURRI' AS tbl_name
+			     , REGDATE
+			  FROM RS_GT_SCORE_CURRI
+			 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+			   AND STUDENTS_NO = #{std_id}
+			   AND LEARNING_NAME LIKE CONCAT('D','%')
+			UNION ALL
+				SELECT '메인숙제' AS tbl_type
+				     , ACTIVITY_NO AS activity_no
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'DU' THEN 'DUBBING'
+			            END AS learning_title
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'PRA' THEN 'PRACTICE'
+				     		WHEN SUBSTR(LEARNING_NAME, 4) = 'LIVE' THEN 'LIVE'
+				            END AS learning_type
+				     , CONCAT(ALPHA, ' Alpha') AS alpha
+				     , FLOOR((LENGTH(LEARNING_TIME) - LENGTH(REPLACE(LEARNING_TIME, '/', ''))) / LENGTH('/') + 1) AS try_cnt
+				     , IF(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))) = 0, CONCAT(SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초'),
+				       CONCAT(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '분 ', SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초')) AS learning_time
+				     , INTNO AS intno
+			         , 'HOMEWORK' AS tbl_name
+			         , REGDATE
+				  FROM RS_GT_SCORE_HOMEWORK
+				 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+				   AND STUDENTS_NO = #{std_id}
+				   AND LEARNING_NAME LIKE CONCAT('D','%')
+			UNION ALL
+				SELECT '자유학습' AS tbl_type
+				     , ACTIVITY_NO AS activity_no
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'DU' THEN 'DUBBING'
+			            END AS learning_title
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'PRA' THEN 'PRACTICE'
+				     		WHEN SUBSTR(LEARNING_NAME, 4) = 'LIVE' THEN 'LIVE'
+				            END AS learning_type
+				     , CONCAT(CARAT, ' Carat') AS alpha
+				     , FLOOR((LENGTH(LEARNING_TIME) - LENGTH(REPLACE(LEARNING_TIME, '/', ''))) / LENGTH('/') + 1) AS try_cnt
+				     , IF(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))) = 0, CONCAT(SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초'),
+				       CONCAT(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '분 ', SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초')) AS learning_time
+				     , INTNO AS intno
+			         , 'FREE' AS tbl_name
+			         , REGDATE
+				  FROM RS_GT_SCORE_FREE
+				 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+				   AND STUDENTS_NO = #{std_id}
+				   AND LEARNING_NAME LIKE CONCAT('D','%')) A
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.REGDATE DESC
+       		</otherwise>
+      	</choose>
+	</select>
+
+	<select id="getQaInfoListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CommonMapper.getQaInfoListRetrieve */
+	SELECT *
+	  FROM
+			(SELECT '메인학습' AS tbl_type
+			     , ACTIVITY_NO AS activity_no
+			     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'QA' THEN 'QNA'
+			            END AS learning_title
+			     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'TEST' THEN 'TEST'
+			            END AS learning_type
+			     , CONCAT(ALPHA, ' Alpha') AS alpha
+			     , IF(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))) = 0, CONCAT(SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초'),
+			       CONCAT(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '분 ', SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초')) AS learning_time
+			     , INTNO AS intno
+			     , 'CURRI' AS tbl_name
+			     , REGDATE
+			  FROM RS_GT_SCORE_CURRI
+			 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+			   AND STUDENTS_NO = #{std_id}
+			   AND LEARNING_NAME LIKE CONCAT('Q','%')
+			UNION ALL
+				SELECT '메인숙제' AS tbl_type
+				     , ACTIVITY_NO AS activity_no
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'QA' THEN 'QNA'
+			            END AS learning_title
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'TEST' THEN 'TEST'
+				            END AS learning_type
+				     , CONCAT(ALPHA, ' Alpha') AS alpha
+				     , IF(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))) = 0, CONCAT(SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초'),
+				       CONCAT(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '분 ', SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초')) AS learning_time
+				     , INTNO AS intno
+			         , 'HOMEWORK' AS tbl_name
+			         , REGDATE
+				  FROM RS_GT_SCORE_HOMEWORK
+				 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+				   AND STUDENTS_NO = #{std_id}
+				   AND LEARNING_NAME LIKE CONCAT('Q','%')
+			UNION ALL
+				SELECT '자유학습' AS tbl_type
+				     , ACTIVITY_NO AS activity_no
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 1, 2) = 'QA' THEN 'QNA'
+			            END AS learning_title
+				     , CASE WHEN SUBSTR(LEARNING_NAME, 4) = 'TEST' THEN 'TEST'
+				            END AS learning_type
+				     , CONCAT(CARAT, ' Carat') AS alpha
+				     , IF(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))) = 0, CONCAT(SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초'),
+				       CONCAT(MINUTE(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '분 ', SECOND(SEC_TO_TIME(SUBSTRING_INDEX(LEARNING_TIME, '_', 1))), '초')) AS learning_time
+				     , INTNO AS intno
+			         , 'FREE' AS tbl_name
+			         , REGDATE
+				  FROM RS_GT_SCORE_FREE
+				 WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+				   AND STUDENTS_NO = #{std_id}
+				   AND LEARNING_NAME LIKE CONCAT('Q','%')) A
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.REGDATE DESC
+       		</otherwise>
+      	</choose>
+	</select>
+
+	<select id="getAsInfoListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CommonMapper.getAsInfoListRetrieve */
+	SELECT *
+	  FROM
+			(SELECT CONCAT(GRADE_1, GRADE_2) AS grade
+		          , TIME AS time
+		          , CONCAT(ALPHA, ' Alpha') AS alpha
+		          , DATE_FORMAT(REGDATE, '%Y-%m-%d %H:%i:%s') AS regdate
+		       FROM RS_GT_SCORE_AMERICA
+			  WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+			    AND STUDENTS_NO = #{std_id}
+			UNION ALL
+				SELECT CONCAT(GRADE_1, GRADE_2) AS grade
+		          , TIME AS time
+		          , CONCAT(ALPHA, ' Alpha') AS alpha
+		          , DATE_FORMAT(REGDATE, '%Y-%m-%d %H:%i:%s') AS regdate
+		       FROM RS_GT_SCORE_AMERICA_HOMEWORK
+			  WHERE REGDATE BETWEEN CONCAT(#{fr_date}, ' 00:00:00') AND CONCAT(#{to_date}, ' 23:59:59')
+			    AND STUDENTS_NO = #{std_id}) A
+	  <choose>
+       	<when test="sidx != ''">
+        	ORDER BY ${sidx} ${sord}
+       	</when>
+       	<otherwise>
+        	ORDER BY A.REGDATE DESC
+       	</otherwise>
+      </choose>
+	</select>
+
+	<select id="getStudentInfo" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentInfo */
+		SELECT CONCAT('(', CONCAT(DATE_FORMAT(A.RPT_SDT, '%Y-%m-%d') , '~' , DATE_FORMAT(A.RPT_EDT, '%Y-%m-%d')) ,')') AS rpt_period
+		     , B.STD_NM AS rpt_std_nm
+		     , B.SCH_NM AS rpt_sch_nm
+		     , FC_GET_CODE_NM('SCH_LVL', B.SCH_LVL) AS rpt_sch_lvl
+		     , '' AS rpt_std_gubun
+		     , C.ACA_NM AS rpt_aca_nm
+		     , C.TEL_NO AS rpt_tel_no
+		     , C.ADDR AS rpt_addr
+		     , C.ADDR_DTL AS rpt_addr_dtl
+		  FROM TB_STD_RPT A
+		  JOIN TB_STD_INFO B
+		    ON B.STD_ID = A.STD_ID
+		  JOIN TB_ACA C
+		  	ON C.ACA_ID = B.ACA_ID
+	     WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}
+	</select>
+
+	<select id="getStudentAcaInfoList" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentAcaInfoList */
+		SELECT FC_GET_CODE_NM('LIB_SUBJECT_CD', A.SUBJECT_CD) AS rpt_subject_nm
+		     , IFNULL(A.ACA_NM, '') AS rpt_aca_nm
+		     , IFNULL(A.TEACHER_NM, '')   AS rpt_teacher_nm
+		     , IFNULL(CONCAT(FC_GET_CODE_NM('DOW', C.DOW), ' ' ,CONCAT(C.IN_TM, ' ~ ' , C.OUT_TM)), '') AS rpt_schedule
+		     , IFNULL(CONCAT(TRUNCATE(((HOUR(TIMEDIFF(CASE WHEN SUBSTRING(C.OUT_TM, 1, 2) = '00' THEN CONCAT('24', SUBSTRING(C.OUT_TM, 3,5))
+		     			ELSE C.OUT_TM END, C.IN_TM))*60) + MINUTE(TIMEDIFF(CASE WHEN SUBSTRING(C.OUT_TM, 1, 2) = '00' THEN CONCAT('24', SUBSTRING(C.OUT_TM, 3,5))
+		     			ELSE C.OUT_TM END, C.IN_TM))) / 60, 0), '시간 ',
+		     		  LPAD(MOD(((HOUR(TIMEDIFF(CASE WHEN SUBSTRING(C.OUT_TM, 1, 2) = '00' THEN CONCAT('24', SUBSTRING(C.OUT_TM, 3,5))
+		     			ELSE C.OUT_TM END, C.IN_TM))*60) + MINUTE(TIMEDIFF(CASE WHEN SUBSTRING(C.OUT_TM, 1, 2) = '00' THEN CONCAT('24', SUBSTRING(C.OUT_TM, 3,5))
+		     			ELSE C.OUT_TM END, C.IN_TM))), 60), 2, '0'), '분'), '')  AS rpt_aca_study_tm
+		     , IFNULL(CONCAT(TRUNCATE(C.ADD_DTM / 60, 0), '시간 ', LPAD(MOD(C.ADD_DTM, 60), 2, '0'), '분'), '')  AS rpt_aca_study_add_tm
+		     , IFNULL((HOUR(TIMEDIFF(CASE WHEN SUBSTRING(C.OUT_TM, 1, 2) = '00' THEN CONCAT('24', SUBSTRING(C.OUT_TM, 3,5))
+		     			ELSE C.OUT_TM END, C.IN_TM))*60) + MINUTE(TIMEDIFF(CASE WHEN SUBSTRING(C.OUT_TM, 1, 2) = '00' THEN CONCAT('24', SUBSTRING(C.OUT_TM, 3,5))
+		     			ELSE C.OUT_TM END, C.IN_TM)), '0') AS rpt_tm_cal
+		     , IFNULL(C.ADD_DTM, '0') AS rpt_add_tm_cal
+		  FROM TB_STD_SCHD_ACA A
+		  JOIN (SELECT *
+		          FROM TB_STD_RPT_SCHD_ACA
+		         WHERE RPT_SEQ = (SELECT RPT_SEQ
+		        					FROM TB_STD_RPT A
+		        				   WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}
+		        				  )
+		        ) B
+		    ON B.STD_ID = A.STD_ID
+		    AND B.SCHD_NO = A.SCHD_NO
+		  JOIN TB_STD_SCHD_ACA_DTL C
+		    ON C.SCHD_NO = A.SCHD_NO
+		    AND C.STD_ID = A.STD_ID
+		 ORDER BY A.SUBJECT_CD, C.DOW
+	</select>
+
+	<select id="getStudentTotTime" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentTotTime */
+		SELECT C.STD_ID
+		     , C.rpt_atd_cnt
+		     , CONCAT(TRUNCATE(C.rpt_atd_daily_tm / 60, 0), '시간 ', LPAD(MOD(C.rpt_atd_daily_tm, 60), 2, '0'), '분') AS rpt_atd_daily_tm
+		     , CONCAT(TRUNCATE(C.rpt_atd_std_tm / 60, 0), '시간 ', LPAD(MOD(C.rpt_atd_std_tm, 60), 2, '0'), '분') AS rpt_atd_std_tm
+		     , CONCAT(TRUNCATE(C.rpt_atd_std_tot_tm / 60, 0), '시간 ', LPAD(MOD(C.rpt_atd_std_tot_tm, 60), 2, '0'), '분') AS rpt_atd_std_tot_tm
+		  FROM (SELECT A.STD_ID
+		             , COUNT(A.ATD_DT) AS rpt_atd_cnt
+		             , (SELECT SUM(REAL_MM) FROM TB_STD_DAILY_PLAN WHERE STD_ID = A.STD_ID AND ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT) / COUNT(A.ATD_DT) AS rpt_atd_daily_tm
+		             , (SELECT SUM(REAL_MM) FROM TB_STD_DAILY_PLAN WHERE STD_ID = A.STD_ID AND ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT) AS rpt_atd_std_tm
+		             , (SELECT SUM(REAL_MM) FROM TB_STD_DAILY_PLAN WHERE STD_ID = A.STD_ID AND DATE(ATD_DT) <![CDATA[<=]]> DATE(B.RPT_EDT)) AS rpt_atd_std_tot_tm
+		          FROM TB_STD_ATD A
+		          JOIN (SELECT RPT_SEQ
+		                     , STD_ID
+		                     , RPT_SDT
+		                     , RPT_EDT
+		                  FROM TB_STD_RPT
+		                 WHERE RPT_SEQ_ENC = #{rpt_seq_enc}) B
+		            ON B.STD_ID = A.STD_ID
+		          WHERE ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+		            AND ATD_CD = '01'
+		          GROUP BY A.STD_ID) C
+	</select>
+	
+	<select id="getSelectAcaId" parameterType="string" resultType="string">
+	/* CommonMapper.getSelectAcaId */
+		SELECT
+			ACA_ID
+		FROM
+			TB_STD_INFO
+		WHERE
+			ACA_ID = 
+				(SELECT STD_ID FROM TB_STD_RPT WHERE RPT_SEQ_ENC = #{rpt_seq_enc} )			
+	</select>
+
+	<select id="getStudentAtdAvgDt" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentAtdAvgDt */
+		SELECT  		
+			ROUND(AVG(ATD_CNT), 1) AS atd_avg_dt	
+		FROM 	
+			( 
+				SELECT  
+					STD_ID
+					, COUNT(1) AS REG_CNT
+					, SUM(CASE WHEN ATD_CD = '01' THEN 1 ELSE NULL END) AS ATD_CNT
+				FROM  
+					TB_STD_ATD A
+				JOIN 
+					(
+					SELECT
+						ACA_ID 
+					   , RPT_SDT
+					   , RPT_EDT
+					FROM 
+						TB_STD_RPT A
+					JOIN 
+						TB_STD_INFO B ON B.STD_ID = A.STD_ID
+					WHERE 
+						A.RPT_SEQ_ENC = #{rpt_seq_enc}
+					) B ON B.ACA_ID = A.ACA_ID
+				WHERE 	
+					A.ACA_ID  = #{aca_id}								
+					AND A.ATD_DT BETWEEN B.RPT_SDT AND RPT_EDT	
+				GROUP BY STD_ID   
+			) T
+	</select>
+
+	<select id="getStudentAtdTopAvg" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentAtdTopAvg */
+		SELECT CONCAT(TRUNCATE(ROUND(Q.TOT / Q.DAY_CNT) / 60, 0), '시간 ', LPAD(MOD(ROUND(Q.TOT / Q.DAY_CNT), 60), 2, '0'), '분') AS atd_top_avg
+		  FROM (SELECT COUNT(*) AS CNT
+		             , SUM(S.REAL_MM) as TOT
+		             , TIMESTAMPDIFF(DAY, S.RPT_SDT, S.RPT_EDT) + 1 AS DAY_CNT
+		          FROM (SELECT @rnum:=@rnum+1 AS ROWNUM
+		                     , TSDP.*
+		                  FROM (SELECT @rnum:=0) r,
+		                        (SELECT D.STD_ID
+		                              , SUM(D.REAL_MM) AS REAL_MM
+		                              , C.RPT_SDT
+		                              , C.RPT_EDT
+		                           FROM TB_STD_DAILY_PLAN D
+		                           JOIN TB_STD_INFO E
+		                             ON E.STD_ID = D.STD_ID
+		                           JOIN (SELECT ACA_ID
+		                                      , RPT_SDT
+		                                      , RPT_EDT
+		                                   FROM TB_STD_RPT A
+		                                   JOIN TB_STD_INFO B
+		                                     ON B.STD_ID = A.STD_ID
+		                                  WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}
+		                                 ) C
+		                             ON C.ACA_ID = E.ACA_ID
+		                          WHERE D.ATD_DT BETWEEN C.RPT_SDT AND C.RPT_EDT
+		                          GROUP BY D.STD_ID) TSDP
+		                 ORDER BY TSDP.REAL_MM DESC
+		              ) S
+		          WHERE S.ROWNUM <![CDATA[<=]]> (SELECT CASE WHEN ROUND(COUNT(T.STD_ID)*0.1) = 0 THEN COUNT(T.STD_ID)
+		                                         ELSE ROUND(COUNT(T.STD_ID)*0.1)
+		                                         END
+		                               FROM (SELECT D.STD_ID
+		                                       FROM TB_STD_DAILY_PLAN D
+		                                       JOIN TB_STD_INFO E
+		                                         ON E.STD_ID = D.STD_ID
+		                                       JOIN (SELECT ACA_ID
+		                                                  , RPT_SDT
+		                                                  , RPT_EDT
+		                                               FROM TB_STD_RPT A
+		                                               JOIN TB_STD_INFO B
+		                                                 ON B.STD_ID = A.STD_ID
+		                                              WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}
+		                                              ) C
+		                                         ON C.ACA_ID = E.ACA_ID
+		                                      WHERE D.ATD_DT BETWEEN C.RPT_SDT AND C.RPT_EDT
+		                                      GROUP BY D.STD_ID) T
+		                              )
+		  ORDER BY S.REAL_MM DESC
+		  ) Q
+	</select>
+
+	<select id="getStudentAtdTopTotAvg" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentAtdTopTotAvg */
+		SELECT CONCAT(TRUNCATE(ROUND(Q.TOT / Q.CNT) / 60, 0), '시간 ', LPAD(MOD(ROUND(Q.TOT / Q.CNT), 60), 2, '0'), '분') AS avg_top_tot_avg
+		  FROM (SELECT COUNT(*) AS CNT
+		             , SUM(S.REAL_MM) as TOT
+		             , TIMESTAMPDIFF(DAY, S.RPT_SDT, S.RPT_EDT) + 1 AS DAY_CNT
+		          FROM (SELECT @rnum:=@rnum+1 AS ROWNUM
+		                     , TSDP.*
+		                  FROM (SELECT @rnum:=0) r,
+		                        (SELECT D.STD_ID
+		                              , SUM(D.REAL_MM) AS REAL_MM
+		                              , C.RPT_SDT
+		                              , C.RPT_EDT
+		                           FROM TB_STD_DAILY_PLAN D
+		                           JOIN TB_STD_INFO E
+		                             ON E.STD_ID = D.STD_ID
+		                           JOIN (SELECT ACA_ID
+		                                      , RPT_SDT
+		                                      , RPT_EDT
+		                                   FROM TB_STD_RPT A
+		                                   JOIN TB_STD_INFO B
+		                                     ON B.STD_ID = A.STD_ID
+		                                  WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}
+		                                 ) C
+		                             ON C.ACA_ID = E.ACA_ID
+		                          WHERE D.ATD_DT BETWEEN C.RPT_SDT AND C.RPT_EDT
+		                          GROUP BY D.STD_ID) TSDP
+		                 ORDER BY TSDP.REAL_MM DESC
+		              ) S
+		          WHERE S.ROWNUM <![CDATA[<=]]> (SELECT CASE WHEN ROUND(COUNT(T.STD_ID)*0.1) = 0 THEN COUNT(T.STD_ID)
+		                                         ELSE ROUND(COUNT(T.STD_ID)*0.1)
+		                                         END
+		                               FROM (SELECT D.STD_ID
+		                                       FROM TB_STD_DAILY_PLAN D
+		                                       JOIN TB_STD_INFO E
+		                                         ON E.STD_ID = D.STD_ID
+		                                       JOIN (SELECT ACA_ID
+		                                                  , RPT_SDT
+		                                                  , RPT_EDT
+		                                               FROM TB_STD_RPT A
+		                                               JOIN TB_STD_INFO B
+		                                                 ON B.STD_ID = A.STD_ID
+		                                              WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}
+		                                              ) C
+		                                         ON C.ACA_ID = E.ACA_ID
+		                                      WHERE D.ATD_DT BETWEEN C.RPT_SDT AND C.RPT_EDT
+		                                      GROUP BY D.STD_ID) T
+		                              )
+		  ORDER BY S.REAL_MM DESC
+		  ) Q
+	</select>
+
+	<select id="getStudentChartDt" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentChartDt */
+		SELECT CONCAT(DATE_FORMAT(A.DATE, '%d'), '(' ,(CONCAT(FC_GET_CODE_NM('DOW', DATE_FORMAT(A.DATE, '%w')),')'))) AS chart_date
+		  FROM TB_CALENDAR A,
+		       (SELECT RPT_SDT
+		             , RPT_EDT
+		          FROM TB_STD_RPT A
+		          JOIN TB_STD_INFO B
+		            ON B.STD_ID = A.STD_ID
+		         WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}) B
+		 WHERE A.DATE BETWEEN B.RPT_SDT AND B.RPT_EDT
+		 ORDER BY A.DATE
+	</select>
+
+	<select id="getStudentChartDayStd" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentChartDayStd */
+		SELECT CASE WHEN SUM(D.REAL_MM) IS NULL THEN 0
+		            WHEN SUM(D.REAL_MM) = '' THEN 0
+		            ELSE SUM(D.REAL_MM)
+		            END AS chart_day_std
+		  FROM (SELECT A.DATE
+				  FROM TB_CALENDAR A,
+				       (SELECT RPT_SDT
+				             , RPT_EDT
+				          FROM TB_STD_RPT A
+				          JOIN TB_STD_INFO B
+				            ON B.STD_ID = A.STD_ID
+				         WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}) B
+				 WHERE A.DATE BETWEEN B.RPT_SDT AND B.RPT_EDT
+		 		 ORDER BY A.DATE) C
+		  LEFT OUTER JOIN (SELECT A.ATD_DT
+							    , A.REAL_MM
+							 FROM TB_STD_DAILY_PLAN A
+							 JOIN (SELECT STD_ID
+							            , RPT_SDT
+							            , RPT_EDT
+							         FROM TB_STD_RPT A
+							        WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}) B
+		    				   ON B.STD_ID = A.STD_ID
+		 					WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+		 					ORDER BY A.ATD_DT) D
+		 	ON D.ATD_DT = C.DATE
+		 GROUP BY C.DATE
+		 ORDER BY C.DATE
+	</select>
+
+	<select id="getStudentChartDayAca" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentChartDayAca */
+		SELECT CASE WHEN SUM(B.REAL_MM) IS NULL THEN 0
+		            WHEN SUM(B.REAL_MM) = '' THEN 0
+		            ELSE SUM(B.REAL_MM)
+		            END AS chart_day_aca
+		  FROM (SELECT A.DATE
+			  	  FROM TB_CALENDAR A,
+			       	   (SELECT RPT_SDT
+			             	 , RPT_EDT
+			          	  FROM TB_STD_RPT A
+			          	  JOIN TB_STD_INFO B
+			            	ON B.STD_ID = A.STD_ID
+			         	 WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}) B
+		 		 WHERE A.DATE BETWEEN B.RPT_SDT AND B.RPT_EDT
+		 		 ORDER BY A.DATE) A
+		  LEFT OUTER JOIN (SELECT D.ATD_DT
+			    				, ROUND(SUM(D.REAL_MM)/COUNT(DISTINCT D.STD_ID)) AS REAL_MM
+							 FROM TB_STD_DAILY_PLAN D
+							 JOIN TB_STD_INFO E
+							   ON E.STD_ID = D.STD_ID
+							 JOIN (SELECT ACA_ID
+							            , RPT_SDT
+							            , RPT_EDT
+							         FROM TB_STD_RPT A
+							         JOIN TB_STD_INFO B
+							           ON B.STD_ID = A.STD_ID
+							        WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}
+						   ) C
+			 				  ON C.ACA_ID = E.ACA_ID
+		  				   WHERE D.ATD_DT BETWEEN C.RPT_SDT AND C.RPT_EDT
+						   GROUP BY D.ATD_DT
+						   ORDER BY D.ATD_DT) B
+			 ON B.ATD_DT = A.DATE
+		  GROUP BY A.DATE
+		  ORDER BY A.DATE
+	</select>
+
+	<select id="getStudentChartDayTop" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentChartDayTop */
+		SELECT CASE WHEN SUM(X.REAL_MM) IS NULL THEN 0
+		            WHEN SUM(X.REAL_MM) = '' THEN 0
+		            ELSE SUM(X.REAL_MM)
+		            END AS chart_day_top
+		  FROM (SELECT A.DATE
+			  	  FROM TB_CALENDAR A,
+			       	   (SELECT RPT_SDT
+			             	 , RPT_EDT
+			          	  FROM TB_STD_RPT A
+			          	  JOIN TB_STD_INFO B
+			            	ON B.STD_ID = A.STD_ID
+			         	 WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}) B
+		 		 WHERE A.DATE BETWEEN B.RPT_SDT AND B.RPT_EDT
+		 		 ORDER BY A.DATE) Z
+		  LEFT OUTER JOIN (SELECT Q.ATD_DT
+		 					    , ROUND(SUM(Q.REAL_MM)/COUNT(DISTINCT Q.STD_ID)) AS REAL_MM
+							FROM TB_STD_DAILY_PLAN Q,
+								 (SELECT RPT_SDT
+								 	   , RPT_EDT
+								 	FROM TB_STD_RPT
+								   WHERE RPT_SEQ_ENC = #{rpt_seq_enc}) W
+							WHERE Q.STD_ID IN (SELECT S.STD_ID
+												 FROM (SELECT @rnum:=@rnum+1 AS ROWNUM
+												            , TSDP.*
+												         FROM (SELECT @rnum:=0) r,
+												              (SELECT D.STD_ID
+												                    , SUM(D.REAL_MM) AS REAL_MM
+												                    , C.RPT_SDT
+												                    , C.RPT_EDT
+												                    , D.ATD_DT
+												                 FROM TB_STD_DAILY_PLAN D
+												                 JOIN TB_STD_INFO E
+												                   ON E.STD_ID = D.STD_ID
+												                 JOIN (SELECT ACA_ID
+												                            , RPT_SDT
+												                            , RPT_EDT
+												                         FROM TB_STD_RPT A
+												                         JOIN TB_STD_INFO B
+												                           ON B.STD_ID = A.STD_ID
+												                        WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}
+												                       ) C
+												                   ON C.ACA_ID = E.ACA_ID
+												                 WHERE D.ATD_DT BETWEEN C.RPT_SDT AND C.RPT_EDT
+												                 GROUP BY D.STD_ID) TSDP
+												         ORDER BY TSDP.REAL_MM DESC
+												      ) S
+												  WHERE S.ROWNUM <![CDATA[<=]]> (SELECT CASE WHEN ROUND(COUNT(T.STD_ID)*0.1) = 0 THEN COUNT(T.STD_ID)
+												                                 			 ELSE ROUND(COUNT(T.STD_ID)*0.1)
+												                                 			 END
+												                       			   FROM (SELECT D.STD_ID
+												                               			   FROM TB_STD_DAILY_PLAN D
+															                               JOIN TB_STD_INFO E
+															                                 ON E.STD_ID = D.STD_ID
+															                               JOIN (SELECT ACA_ID
+															                                          , RPT_SDT
+															                                          , RPT_EDT
+															                                       FROM TB_STD_RPT A
+															                                       JOIN TB_STD_INFO B
+															                                         ON B.STD_ID = A.STD_ID
+															                                      WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}
+												                                      	 		 ) C
+												                                 			ON C.ACA_ID = E.ACA_ID
+												                              			 WHERE D.ATD_DT BETWEEN C.RPT_SDT AND C.RPT_EDT
+												                              			 GROUP BY D.STD_ID) T
+												                      				))
+							  AND Q.ATD_DT BETWEEN W.RPT_SDT AND W.RPT_EDT
+							GROUP BY Q.ATD_DT
+							ORDER BY Q.ATD_DT) X
+             ON X.ATD_DT = Z.DATE
+		  GROUP BY Z.DATE
+		  ORDER BY Z.DATE
+	</select>
+
+	<select id="getStudentChartDayAvgAca" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentChartDayAvgAca */
+        SELECT SUM(D.SUN) AS chart_daily_sun
+             , SUM(D.MON) AS chart_daily_mon
+             , SUM(D.TUE) AS chart_daily_tue
+             , SUM(D.WED) AS chart_daily_wed
+             , SUM(D.THU) AS chart_daily_thu
+             , SUM(D.FRI) AS chart_daily_fri
+             , SUM(D.SAT) AS chart_daily_sat
+          FROM	(SELECT CASE WHEN C.DOW = '0' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+						            ELSE ''
+						            END AS SUN
+					         , CASE WHEN C.DOW = '1' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+					                ELSE ''
+					                END AS MON
+					         , CASE WHEN C.DOW = '2' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+					                ELSE ''
+					                END AS TUE
+					         , CASE WHEN C.DOW = '3' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+					                ELSE ''
+					                END AS WED
+					         , CASE WHEN C.DOW = '4' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+					                ELSE ''
+					                END AS THU
+					         , CASE WHEN C.DOW = '5' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+					                ELSE ''
+					                END AS FRI
+					         , CASE WHEN C.DOW = '6' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+					                ELSE ''
+					                END AS SAT
+						  FROM TB_STD_SCHD_ACA A
+						  JOIN (SELECT *
+						          FROM TB_STD_RPT_SCHD_ACA
+						         WHERE RPT_SEQ = (SELECT RPT_SEQ
+						        					FROM TB_STD_RPT A
+						        				   WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}
+						        				  )
+						        ) B
+						    ON B.STD_ID = A.STD_ID
+						    AND B.SCHD_NO = A.SCHD_NO
+						  JOIN TB_STD_SCHD_ACA_DTL C
+						    ON C.SCHD_NO = A.SCHD_NO
+						    AND C.STD_ID = A.STD_ID) D
+	</select>
+
+	<select id="getStudentChartDayAvgHom" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentChartDayAvgHom */
+	    SELECT SUM(D.SUN) AS chart_daily_sun
+             , SUM(D.MON) AS chart_daily_mon
+             , SUM(D.TUE) AS chart_daily_tue
+             , SUM(D.WED) AS chart_daily_wed
+             , SUM(D.THU) AS chart_daily_thu
+             , SUM(D.FRI) AS chart_daily_fri
+             , SUM(D.SAT) AS chart_daily_sat
+          FROM (SELECT CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '0' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SUN
+			         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '1' THEN A.REAL_MM
+			                ELSE ''
+			                END AS MON
+		  	         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '2' THEN A.REAL_MM
+			                ELSE ''
+			                END AS TUE
+			         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '3' THEN A.REAL_MM
+			                ELSE ''
+			                END AS WED
+			         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '4' THEN A.REAL_MM
+			                ELSE ''
+			                END AS THU
+				     , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '5' THEN A.REAL_MM
+			                ELSE ''
+			                END AS FRI
+				     , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '6' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SAT
+		   		 FROM TB_STD_DAILY_PLAN A
+		  		 JOIN (SELECT STD_ID
+                 			, RPT_SDT
+                 			, RPT_EDT
+    					 FROM TB_STD_RPT
+    				    WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+		        	   ) B
+		    	   ON B.STD_ID = A.STD_ID
+     			WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+       			  AND A.PLAN_TP = '01') D
+	</select>
+
+	<select id="getStudentChartDayAvgOwn" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentChartDayAvgOwn */
+		SELECT SUM(D.SUN) AS chart_daily_sun
+             , SUM(D.MON) AS chart_daily_mon
+             , SUM(D.TUE) AS chart_daily_tue
+             , SUM(D.WED) AS chart_daily_wed
+             , SUM(D.THU) AS chart_daily_thu
+             , SUM(D.FRI) AS chart_daily_fri
+             , SUM(D.SAT) AS chart_daily_sat
+          FROM (SELECT CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '0' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SUN
+			         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '1' THEN A.REAL_MM
+			                ELSE ''
+			                END AS MON
+		  	         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '2' THEN A.REAL_MM
+			                ELSE ''
+			                END AS TUE
+			         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '3' THEN A.REAL_MM
+			                ELSE ''
+			                END AS WED
+			         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '4' THEN A.REAL_MM
+			                ELSE ''
+			                END AS THU
+				     , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '5' THEN A.REAL_MM
+			                ELSE ''
+			                END AS FRI
+				     , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '6' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SAT
+		   		 FROM TB_STD_DAILY_PLAN A
+		  		 JOIN (SELECT STD_ID
+                 			, RPT_SDT
+                 			, RPT_EDT
+    					 FROM TB_STD_RPT
+    				    WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+		        	   ) B
+		    	   ON B.STD_ID = A.STD_ID
+     			WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+       			  AND A.PLAN_TP = '02') D
+	</select>
+
+ 	<select id="getStudentDayAvgAcaList" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentDayAvgAcaList */
+		SELECT SUM(D.SUN) AS day_avg_sun
+		     , SUM(D.MON) AS day_avg_mon
+		     , SUM(D.TUE) AS day_avg_tue
+		     , SUM(D.WED) AS day_avg_wed
+		     , SUM(D.THU) AS day_avg_thu
+		     , SUM(D.FRI) AS day_avg_fri
+		     , SUM(D.SAT) AS day_avg_sat
+		  FROM (SELECT CASE WHEN C.DOW = '0' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+				            ELSE ''
+				            END AS SUN
+			         , CASE WHEN C.DOW = '1' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+			                ELSE ''
+			                END AS MON
+			         , CASE WHEN C.DOW = '2' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+			                ELSE ''
+			                END AS TUE
+			         , CASE WHEN C.DOW = '3' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+			                ELSE ''
+			                END AS WED
+			         , CASE WHEN C.DOW = '4' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+			                ELSE ''
+			                END AS THU
+			         , CASE WHEN C.DOW = '5' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+			                ELSE ''
+			                END AS FRI
+			         , CASE WHEN C.DOW = '6' THEN (HOUR(TIMEDIFF(C.OUT_TM, C.IN_TM))*60) + MINUTE(TIMEDIFF(C.OUT_TM, C.IN_TM)) + IFNULL(C.ADD_DTM, 0)
+			                ELSE ''
+			                END AS SAT
+				  FROM TB_STD_SCHD_ACA A
+				  JOIN (SELECT *
+				          FROM TB_STD_RPT_SCHD_ACA
+				         WHERE RPT_SEQ = (SELECT RPT_SEQ
+				        					FROM TB_STD_RPT A
+				        				   WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc}
+				        				  )
+				        ) B
+				    ON B.STD_ID = A.STD_ID
+				    AND B.SCHD_NO = A.SCHD_NO
+				  JOIN TB_STD_SCHD_ACA_DTL C
+				    ON C.SCHD_NO = A.SCHD_NO
+				    AND C.STD_ID = A.STD_ID) D
+	</select>
+
+	<select id="getStudentDayAvgAcaSubList" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentDayAvgAcaSubList */
+		SELECT CN.sub_cnt
+		     , SU.sub_sun
+		     , MO.sub_mon
+		     , TU.sub_tue
+		     , WE.sub_wed
+		     , TH.sub_thu
+		     , FR.sub_fri
+		     , SA.sub_sat
+		  FROM (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+				  FROM (SELECT CASE WHEN C.DOW = '0' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+						            ELSE ''
+						            END AS SUN
+						     , CASE WHEN C.DOW = '1' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+						            ELSE ''
+						            END AS MON
+						     , CASE WHEN C.DOW = '2' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+						            ELSE ''
+						            END AS TUE
+						     , CASE WHEN C.DOW = '3' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+						            ELSE ''
+						            END AS WED
+						     , CASE WHEN C.DOW = '4' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+						            ELSE ''
+						            END AS THU
+						     , CASE WHEN C.DOW = '5' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+						            ELSE ''
+						            END AS FRI
+						     , CASE WHEN C.DOW = '6' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+						            ELSE ''
+						            END AS SAT
+						     , A.SUBJECT_CD
+						  FROM TB_STD_SCHD_ACA A
+						  JOIN (SELECT *
+							      FROM TB_STD_RPT_SCHD_ACA
+							     WHERE RPT_SEQ = (SELECT RPT_SEQ
+							        				FROM TB_STD_RPT A
+							        			   WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc})
+				      			) B
+				 		   ON B.STD_ID = A.STD_ID
+				    	   AND B.SCHD_NO = A.SCHD_NO
+						  JOIN TB_STD_SCHD_ACA_DTL C
+				  			ON C.SCHD_NO = A.SCHD_NO
+				   	 		AND C.STD_ID = A.STD_ID
+				     	  GROUP BY C.DOW, A.SUBJECT_CD) D
+			    GROUP BY D.SUBJECT_CD) CN
+		 LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+					     , MAX(D.SUN) AS sub_sun
+					  FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD) AS SUN
+					             , A.SUBJECT_CD
+							  FROM TB_STD_SCHD_ACA A
+					  		  JOIN (SELECT *
+						      		  FROM TB_STD_RPT_SCHD_ACA
+						     		 WHERE RPT_SEQ = (SELECT RPT_SEQ
+						        						FROM TB_STD_RPT A
+						        					   WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc})
+						    		) B
+								ON B.STD_ID = A.STD_ID
+					    		AND B.SCHD_NO = A.SCHD_NO
+				      		  JOIN TB_STD_SCHD_ACA_DTL C
+								ON C.SCHD_NO = A.SCHD_NO
+					    		AND C.STD_ID = A.STD_ID
+					  		 WHERE C.DOW = '0'
+					         GROUP BY C.DOW, A.SUBJECT_CD) D
+					GROUP BY D.SUBJECT_CD) SU
+		   ON SU.sub_cnt = CN.sub_cnt
+		 LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+					     , MAX(D.MON) AS sub_mon
+					  FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD) AS MON
+					             , A.SUBJECT_CD
+							  FROM TB_STD_SCHD_ACA A
+					  		  JOIN (SELECT *
+						      		  FROM TB_STD_RPT_SCHD_ACA
+						     		 WHERE RPT_SEQ = (SELECT RPT_SEQ
+						        						FROM TB_STD_RPT A
+						        					   WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc})
+						    		) B
+								ON B.STD_ID = A.STD_ID
+					    		AND B.SCHD_NO = A.SCHD_NO
+				      		  JOIN TB_STD_SCHD_ACA_DTL C
+								ON C.SCHD_NO = A.SCHD_NO
+					    		AND C.STD_ID = A.STD_ID
+					  		 WHERE C.DOW = '1'
+					         GROUP BY C.DOW, A.SUBJECT_CD) D
+					GROUP BY D.SUBJECT_CD) MO
+		   ON MO.sub_cnt = CN.sub_cnt
+		 LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+					     , MAX(D.TUE) AS sub_tue
+					  FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD) AS TUE
+					             , A.SUBJECT_CD
+							  FROM TB_STD_SCHD_ACA A
+					  		  JOIN (SELECT *
+						      		  FROM TB_STD_RPT_SCHD_ACA
+						     		 WHERE RPT_SEQ = (SELECT RPT_SEQ
+						        						FROM TB_STD_RPT A
+						        					   WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc})
+						    		) B
+								ON B.STD_ID = A.STD_ID
+					    		AND B.SCHD_NO = A.SCHD_NO
+				      		  JOIN TB_STD_SCHD_ACA_DTL C
+								ON C.SCHD_NO = A.SCHD_NO
+					    		AND C.STD_ID = A.STD_ID
+					  		 WHERE C.DOW = '2'
+					         GROUP BY C.DOW, A.SUBJECT_CD) D
+					GROUP BY D.SUBJECT_CD) TU
+		   ON TU.sub_cnt = CN.sub_cnt
+		 LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+					     , MAX(D.WED) AS sub_wed
+					  FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD) AS WED
+					             , A.SUBJECT_CD
+							  FROM TB_STD_SCHD_ACA A
+					  		  JOIN (SELECT *
+						      		  FROM TB_STD_RPT_SCHD_ACA
+						     		 WHERE RPT_SEQ = (SELECT RPT_SEQ
+						        						FROM TB_STD_RPT A
+						        					   WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc})
+						    		) B
+								ON B.STD_ID = A.STD_ID
+					    		AND B.SCHD_NO = A.SCHD_NO
+				      		  JOIN TB_STD_SCHD_ACA_DTL C
+								ON C.SCHD_NO = A.SCHD_NO
+					    		AND C.STD_ID = A.STD_ID
+					  		 WHERE C.DOW = '3'
+					         GROUP BY C.DOW, A.SUBJECT_CD) D
+					GROUP BY D.SUBJECT_CD) WE
+		   ON WE.sub_cnt = CN.sub_cnt
+		 LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+					     , MAX(D.THU) AS sub_thu
+					  FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD) AS THU
+					             , A.SUBJECT_CD
+							  FROM TB_STD_SCHD_ACA A
+					  		  JOIN (SELECT *
+						      		  FROM TB_STD_RPT_SCHD_ACA
+						     		 WHERE RPT_SEQ = (SELECT RPT_SEQ
+						        						FROM TB_STD_RPT A
+						        					   WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc})
+						    		) B
+								ON B.STD_ID = A.STD_ID
+					    		AND B.SCHD_NO = A.SCHD_NO
+				      		  JOIN TB_STD_SCHD_ACA_DTL C
+								ON C.SCHD_NO = A.SCHD_NO
+					    		AND C.STD_ID = A.STD_ID
+					  		 WHERE C.DOW = '4'
+					         GROUP BY C.DOW, A.SUBJECT_CD) D
+					GROUP BY D.SUBJECT_CD) TH
+		   ON TH.sub_cnt = CN.sub_cnt
+		 LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+					     , MAX(D.FRI) AS sub_fri
+					  FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD) AS FRI
+					             , A.SUBJECT_CD
+							  FROM TB_STD_SCHD_ACA A
+					  		  JOIN (SELECT *
+						      		  FROM TB_STD_RPT_SCHD_ACA
+						     		 WHERE RPT_SEQ = (SELECT RPT_SEQ
+						        						FROM TB_STD_RPT A
+						        					   WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc})
+						    		) B
+								ON B.STD_ID = A.STD_ID
+					    		AND B.SCHD_NO = A.SCHD_NO
+				      		  JOIN TB_STD_SCHD_ACA_DTL C
+								ON C.SCHD_NO = A.SCHD_NO
+					    		AND C.STD_ID = A.STD_ID
+					  		 WHERE C.DOW = '5'
+					         GROUP BY C.DOW, A.SUBJECT_CD) D
+					GROUP BY D.SUBJECT_CD) FR
+		   ON FR.sub_cnt = CN.sub_cnt
+		 LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+					     , MAX(D.SAT) AS sub_sat
+					  FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD) AS SAT
+					             , A.SUBJECT_CD
+							  FROM TB_STD_SCHD_ACA A
+					  		  JOIN (SELECT *
+						      		  FROM TB_STD_RPT_SCHD_ACA
+						     		 WHERE RPT_SEQ = (SELECT RPT_SEQ
+						        						FROM TB_STD_RPT A
+						        					   WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc})
+						    		) B
+								ON B.STD_ID = A.STD_ID
+					    		AND B.SCHD_NO = A.SCHD_NO
+				      		  JOIN TB_STD_SCHD_ACA_DTL C
+								ON C.SCHD_NO = A.SCHD_NO
+					    		AND C.STD_ID = A.STD_ID
+					  		 WHERE C.DOW = '6'
+					         GROUP BY C.DOW, A.SUBJECT_CD) D
+					GROUP BY D.SUBJECT_CD) SA
+		   ON SA.sub_cnt = CN.sub_cnt
+		WHERE (SU.sub_sun IS NOT NULL OR MO.sub_mon IS NOT NULL
+               OR TU.sub_tue IS NOT NULL OR WE.sub_wed IS NOT NULL
+               OR TH.sub_thu IS NOT NULL OR FR.sub_fri IS NOT NULL
+               OR SA.sub_sat IS NOT NULL)
+	</select>
+
+	<select id="getStudentDayAvgHomList" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentDayAvgHomList */
+		SELECT SUM(C.SUN) AS day_avg_sun
+		     , SUM(C.MON) AS day_avg_mon
+		     , SUM(C.TUE) AS day_avg_tue
+		     , SUM(C.WED) AS day_avg_wed
+		     , SUM(C.THU) AS day_avg_thu
+		     , SUM(C.FRI) AS day_avg_fri
+		     , SUM(C.SAT) AS day_avg_sat
+     	  FROM (SELECT CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '0' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SUN
+			         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '1' THEN A.REAL_MM
+			                ELSE ''
+			                END AS MON
+		  	         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '2' THEN A.REAL_MM
+			                ELSE ''
+			                END AS TUE
+			         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '3' THEN A.REAL_MM
+			                ELSE ''
+			                END AS WED
+			         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '4' THEN A.REAL_MM
+			                ELSE ''
+			                END AS THU
+				     , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '5' THEN A.REAL_MM
+			                ELSE ''
+			                END AS FRI
+				     , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '6' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SAT
+		   		 FROM TB_STD_DAILY_PLAN A
+		  		 JOIN (SELECT STD_ID
+                 			, RPT_SDT
+                 			, RPT_EDT
+    					 FROM TB_STD_RPT
+    				    WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+		        	   ) B
+		    	   ON B.STD_ID = A.STD_ID
+     			WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+       			  AND A.PLAN_TP = '01') C
+	</select>
+
+	<select id="getStudentDayAvgHomSubList" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentDayAvgHomSubList */
+		SELECT CN.sub_cnt
+		     , SU.sub_sun
+		     , MO.sub_mon
+		     , TU.sub_tue
+		     , WE.sub_wed
+		     , TH.sub_thu
+		     , FR.sub_fri
+		     , SA.sub_sat
+          FROM (SELECT ROW_NUMBER() OVER(ORDER BY C.SUBJECT_CD) AS sub_cnt
+		  		  FROM (SELECT CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '0' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+					                ELSE ''
+					                END AS SUN
+					         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '1' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+					                ELSE ''
+					                END AS MON
+					         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '2' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+					                ELSE ''
+					                END AS TUE
+				 	         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '3' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+					                ELSE ''
+					                END AS WED
+			 		         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '4' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+					                ELSE ''
+					                END AS THU
+					         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '5' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+					                ELSE ''
+					                END AS FRI
+					         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '6' THEN FC_GET_CODE_NM('SUBJECT_CD', A.SUBJECT_CD)
+					                ELSE ''
+					                END AS SAT
+		                	 , A.SUBJECT_CD
+				  	  	 FROM TB_STD_DAILY_PLAN A
+				  		 JOIN (SELECT STD_ID
+				                    , RPT_SDT
+				                    , RPT_EDT
+				    		     FROM TB_STD_RPT
+	    				 	    WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+			        		   ) B
+			    		   ON B.STD_ID = A.STD_ID
+	     			    WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+	       				  AND A.PLAN_TP = '01'
+		               GROUP BY DATE_FORMAT(A.ATD_DT, '%w'), A.SUBJECT_CD) C
+		               GROUP BY C.SUBJECT_CD) CN
+		   LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+						   , MAX(D.SUN) AS sub_sun
+					    FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', C.SUBJECT_CD) AS SUN
+					         	   , C.SUBJECT_CD
+					      		FROM (SELECT DATE_FORMAT(A.ATD_DT, '%w') AS DOW
+					            		   , A.SUBJECT_CD
+							  	 		FROM TB_STD_DAILY_PLAN A
+							  	 		JOIN (SELECT STD_ID
+								              	   , RPT_SDT
+								              	   , RPT_EDT
+								    		    FROM TB_STD_RPT
+					    				 	   WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+							        		  ) B
+							    	 	  ON B.STD_ID = A.STD_ID
+					     				WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+					       				  AND A.PLAN_TP = '01'
+					        			GROUP BY DATE_FORMAT(A.ATD_DT, '%w'), A.SUBJECT_CD
+					        		  ) C
+					     	  WHERE C.DOW = '0'
+					     	  ) D
+					  GROUP BY D.SUBJECT_CD) SU
+			  ON SU.sub_cnt = CN.sub_cnt
+			LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+						    , MAX(D.MON) AS sub_mon
+					    FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', C.SUBJECT_CD) AS MON
+					         	   , C.SUBJECT_CD
+					      		FROM (SELECT DATE_FORMAT(A.ATD_DT, '%w') AS DOW
+					            		   , A.SUBJECT_CD
+							  	 		FROM TB_STD_DAILY_PLAN A
+							  	 		JOIN (SELECT STD_ID
+								              	   , RPT_SDT
+								              	   , RPT_EDT
+								    		    FROM TB_STD_RPT
+					    				 	   WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+							        		  ) B
+							    	 	  ON B.STD_ID = A.STD_ID
+					     				WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+					       				  AND A.PLAN_TP = '01'
+					        			GROUP BY DATE_FORMAT(A.ATD_DT, '%w'), A.SUBJECT_CD
+					        		  ) C
+					     	  WHERE C.DOW = '1'
+					     	  ) D
+					  GROUP BY D.SUBJECT_CD) MO
+			  ON MO.sub_cnt = CN.sub_cnt
+			LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+						    , MAX(D.TUE) AS sub_tue
+					    FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', C.SUBJECT_CD) AS TUE
+					         	   , C.SUBJECT_CD
+					      		FROM (SELECT DATE_FORMAT(A.ATD_DT, '%w') AS DOW
+					            		   , A.SUBJECT_CD
+							  	 		FROM TB_STD_DAILY_PLAN A
+							  	 		JOIN (SELECT STD_ID
+								              	   , RPT_SDT
+								              	   , RPT_EDT
+								    		    FROM TB_STD_RPT
+					    				 	   WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+							        		  ) B
+							    	 	  ON B.STD_ID = A.STD_ID
+					     				WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+					       				  AND A.PLAN_TP = '01'
+					        			GROUP BY DATE_FORMAT(A.ATD_DT, '%w'), A.SUBJECT_CD
+					        		  ) C
+					     	  WHERE C.DOW = '2'
+					     	  ) D
+					  GROUP BY D.SUBJECT_CD) TU
+			  ON TU.sub_cnt = CN.sub_cnt
+			LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+						    , MAX(D.WED) AS sub_wed
+					    FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', C.SUBJECT_CD) AS WED
+					         	   , C.SUBJECT_CD
+					      		FROM (SELECT DATE_FORMAT(A.ATD_DT, '%w') AS DOW
+					            		   , A.SUBJECT_CD
+							  	 		FROM TB_STD_DAILY_PLAN A
+							  	 		JOIN (SELECT STD_ID
+								              	   , RPT_SDT
+								              	   , RPT_EDT
+								    		    FROM TB_STD_RPT
+					    				 	   WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+							        		  ) B
+							    	 	  ON B.STD_ID = A.STD_ID
+					     				WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+					       				  AND A.PLAN_TP = '01'
+					        			GROUP BY DATE_FORMAT(A.ATD_DT, '%w'), A.SUBJECT_CD
+					        		  ) C
+					     	  WHERE C.DOW = '3'
+					     	  ) D
+					  GROUP BY D.SUBJECT_CD) WE
+			  ON WE.sub_cnt = CN.sub_cnt
+			LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+						    , MAX(D.THU) AS sub_thu
+					    FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', C.SUBJECT_CD) AS THU
+					         	   , C.SUBJECT_CD
+					      		FROM (SELECT DATE_FORMAT(A.ATD_DT, '%w') AS DOW
+					            		   , A.SUBJECT_CD
+							  	 		FROM TB_STD_DAILY_PLAN A
+							  	 		JOIN (SELECT STD_ID
+								              	   , RPT_SDT
+								              	   , RPT_EDT
+								    		    FROM TB_STD_RPT
+					    				 	   WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+							        		  ) B
+							    	 	  ON B.STD_ID = A.STD_ID
+					     				WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+					       				  AND A.PLAN_TP = '01'
+					        			GROUP BY DATE_FORMAT(A.ATD_DT, '%w'), A.SUBJECT_CD
+					        		  ) C
+					     	  WHERE C.DOW = '4'
+					     	  ) D
+					  GROUP BY D.SUBJECT_CD) TH
+			  ON TH.sub_cnt = CN.sub_cnt
+			LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+						    , MAX(D.FRI) AS sub_fri
+					    FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', C.SUBJECT_CD) AS FRI
+					         	   , C.SUBJECT_CD
+					      		FROM (SELECT DATE_FORMAT(A.ATD_DT, '%w') AS DOW
+					            		   , A.SUBJECT_CD
+							  	 		FROM TB_STD_DAILY_PLAN A
+							  	 		JOIN (SELECT STD_ID
+								              	   , RPT_SDT
+								              	   , RPT_EDT
+								    		    FROM TB_STD_RPT
+					    				 	   WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+							        		  ) B
+							    	 	  ON B.STD_ID = A.STD_ID
+					     				WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+					       				  AND A.PLAN_TP = '01'
+					        			GROUP BY DATE_FORMAT(A.ATD_DT, '%w'), A.SUBJECT_CD
+					        		  ) C
+					     	  WHERE C.DOW = '5'
+					     	  ) D
+					  GROUP BY D.SUBJECT_CD) FR
+			  ON FR.sub_cnt = CN.sub_cnt
+			LEFT JOIN (SELECT ROW_NUMBER() OVER(ORDER BY D.SUBJECT_CD) AS sub_cnt
+						    , MAX(D.SAT) AS sub_sat
+					    FROM (SELECT FC_GET_CODE_NM('SUBJECT_CD', C.SUBJECT_CD) AS SAT
+					         	   , C.SUBJECT_CD
+					      		FROM (SELECT DATE_FORMAT(A.ATD_DT, '%w') AS DOW
+					            		   , A.SUBJECT_CD
+							  	 		FROM TB_STD_DAILY_PLAN A
+							  	 		JOIN (SELECT STD_ID
+								              	   , RPT_SDT
+								              	   , RPT_EDT
+								    		    FROM TB_STD_RPT
+					    				 	   WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+							        		  ) B
+							    	 	  ON B.STD_ID = A.STD_ID
+					     				WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+					       				  AND A.PLAN_TP = '01'
+					        			GROUP BY DATE_FORMAT(A.ATD_DT, '%w'), A.SUBJECT_CD
+					        		  ) C
+					     	  WHERE C.DOW = '6'
+					     	  ) D
+					  GROUP BY D.SUBJECT_CD) SA
+			  ON SA.sub_cnt = CN.sub_cnt
+		   WHERE (SU.sub_sun IS NOT NULL OR MO.sub_mon IS NOT NULL
+               	  OR TU.sub_tue IS NOT NULL OR WE.sub_wed IS NOT NULL
+               	  OR TH.sub_thu IS NOT NULL OR FR.sub_fri IS NOT NULL
+               	  OR SA.sub_sat IS NOT NULL)
+	</select>
+
+	<select id="getStudentDayAvgOwnList" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentDayAvgOwnList */
+		SELECT SUM(C.SUN) AS day_avg_sun
+		     , SUM(C.MON) AS day_avg_mon
+		     , SUM(C.TUE) AS day_avg_tue
+		     , SUM(C.WED) AS day_avg_wed
+		     , SUM(C.THU) AS day_avg_thu
+		     , SUM(C.FRI) AS day_avg_fri
+		     , SUM(C.SAT) AS day_avg_sat
+		  FROM (SELECT CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '0' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SUN
+			         , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '1' THEN A.REAL_MM
+			                ELSE ''
+			                END AS MON
+				     , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '2' THEN A.REAL_MM
+			                ELSE ''
+			                END AS TUE
+				     , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '3' THEN A.REAL_MM
+			                ELSE ''
+			                END AS WED
+				     , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '4' THEN A.REAL_MM
+			                ELSE ''
+			                END AS THU
+				     , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '5' THEN A.REAL_MM
+			                ELSE ''
+			                END AS FRI
+				     , CASE WHEN DATE_FORMAT(A.ATD_DT, '%w') = '6' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SAT
+				  FROM TB_STD_DAILY_PLAN A
+				  JOIN (SELECT STD_ID
+		                 	 , RPT_SDT
+		                 	 , RPT_EDT
+		    			  FROM TB_STD_RPT
+		    		     WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+				        ) B
+				    ON B.STD_ID = A.STD_ID
+		     	 WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+		       	   AND A.PLAN_TP = '02') C
+	</select>
+
+	<select id="getStudentTotBarPlan" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentTotBarPlan */
+		SELECT SUM(C.LAN) AS bar_plan_lan
+             , SUM(C.ENG) AS bar_plan_eng
+             , SUM(C.MAT) AS bar_plan_mat
+             , SUM(C.SOC) AS bar_plan_soc
+             , SUM(C.SCI) AS bar_plan_sci
+             , SUM(C.ETC) AS bar_plan_etc
+       	  FROM (SELECT CASE WHEN A.SUBJECT_CD = '01' THEN A.ESTM_MM
+			                ELSE ''
+			                END AS LAN
+			         , CASE WHEN A.SUBJECT_CD = '02' THEN A.ESTM_MM
+			                ELSE ''
+			                END AS ENG
+		  	       , CASE WHEN A.SUBJECT_CD = '03' THEN A.ESTM_MM
+			                ELSE ''
+			                END AS MAT
+			         , CASE WHEN A.SUBJECT_CD = '04' THEN A.ESTM_MM
+			                ELSE ''
+			                END AS SOC
+			         , CASE WHEN A.SUBJECT_CD = '05' THEN A.ESTM_MM
+			                ELSE ''
+			                END AS SCI
+				       , CASE WHEN A.SUBJECT_CD = '99' THEN A.ESTM_MM
+			                ELSE ''
+			                END AS ETC
+		   		 FROM TB_STD_DAILY_PLAN A
+		  		 JOIN (SELECT STD_ID
+                 			, RPT_SDT
+                 			, RPT_EDT
+    					 FROM TB_STD_RPT
+    				    WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+		        	   ) B
+		    	   ON B.STD_ID = A.STD_ID
+     			WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT) C
+	</select>
+
+	<select id="getStudentTotBarImp" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentTotBarImp */
+		SELECT SUM(C.LAN) AS bar_imp_lan
+             , SUM(C.ENG) AS bar_imp_eng
+             , SUM(C.MAT) AS bar_imp_mat
+             , SUM(C.SOC) AS bar_imp_soc
+             , SUM(C.SCI) AS bar_imp_sci
+             , SUM(C.ETC) AS bar_imp_etc
+       	  FROM (SELECT CASE WHEN A.SUBJECT_CD = '01' THEN A.REAL_MM
+			                ELSE ''
+			                END AS LAN
+			         , CASE WHEN A.SUBJECT_CD = '02' THEN A.REAL_MM
+			                ELSE ''
+			                END AS ENG
+		  	       , CASE WHEN A.SUBJECT_CD = '03' THEN A.REAL_MM
+			                ELSE ''
+			                END AS MAT
+			         , CASE WHEN A.SUBJECT_CD = '04' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SOC
+			         , CASE WHEN A.SUBJECT_CD = '05' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SCI
+				       , CASE WHEN A.SUBJECT_CD = '99' THEN A.REAL_MM
+			                ELSE ''
+			                END AS ETC
+		   		 FROM TB_STD_DAILY_PLAN A
+		  		 JOIN (SELECT STD_ID
+                 			, RPT_SDT
+                 			, RPT_EDT
+    					 FROM TB_STD_RPT
+    				    WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+		        	   ) B
+		    	   ON B.STD_ID = A.STD_ID
+     			WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT) C
+	</select>
+
+	<select id="getStudentTotImpPer" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentTotImpPer */
+		SELECT ROUND((SUM(C.LAN) / SUM(C.LAN + C.ENG + C.MAT + C.SOC + C.SCI + C.ETC)) * 100) AS imp_per_lan
+             , ROUND((SUM(C.ENG) / SUM(C.LAN + C.ENG + C.MAT + C.SOC + C.SCI + C.ETC)) * 100) AS imp_per_eng
+             , ROUND((SUM(C.MAT) / SUM(C.LAN + C.ENG + C.MAT + C.SOC + C.SCI + C.ETC)) * 100) AS imp_per_mat
+             , ROUND((SUM(C.SOC) / SUM(C.LAN + C.ENG + C.MAT + C.SOC + C.SCI + C.ETC)) * 100) AS imp_per_soc
+             , ROUND((SUM(C.SCI) / SUM(C.LAN + C.ENG + C.MAT + C.SOC + C.SCI + C.ETC)) * 100) AS imp_per_sci
+             , ROUND((SUM(C.ETC) / SUM(C.LAN + C.ENG + C.MAT + C.SOC + C.SCI + C.ETC)) * 100) AS imp_per_etc
+       	  FROM (SELECT CASE WHEN A.SUBJECT_CD = '01' THEN A.REAL_MM
+			                ELSE ''
+			                END AS LAN
+			         , CASE WHEN A.SUBJECT_CD = '02' THEN A.REAL_MM
+			                ELSE ''
+			                END AS ENG
+		  	       , CASE WHEN A.SUBJECT_CD = '03' THEN A.REAL_MM
+			                ELSE ''
+			                END AS MAT
+			         , CASE WHEN A.SUBJECT_CD = '04' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SOC
+			         , CASE WHEN A.SUBJECT_CD = '05' THEN A.REAL_MM
+			                ELSE ''
+			                END AS SCI
+				       , CASE WHEN A.SUBJECT_CD = '99' THEN A.REAL_MM
+			                ELSE ''
+			                END AS ETC
+		   		 FROM TB_STD_DAILY_PLAN A
+		  		 JOIN (SELECT STD_ID
+                 			, RPT_SDT
+                 			, RPT_EDT
+    					 FROM TB_STD_RPT
+    				    WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+		        	   ) B
+		    	   ON B.STD_ID = A.STD_ID
+     			WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT) C
+	</select>
+
+	<select id="getStudentTotStat" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStudentTotStat */
+		  SELECT FC_GET_CODE_NM('SUBJECT_CD', TC.CODE) AS subject_nm
+		       , IFNULL(W.ACA_TOT_TM, 0) AS aca_tot_tm
+		       , IFNULL(Q.HOME_ESTM_MM, 0) AS home_estm_mm
+		       , IFNULL(Q.HOME_REAL_MM, 0) AS home_real_mm
+		       , IFNULL(Q.HOME_AVG, 0) AS home_avg
+		       , IFNULL(Q.OWN_ESTM_MM, 0) AS own_estm_mm
+		       , IFNULL(Q.OWN_REAL_MM, 0) AS own_real_mm
+		       , IFNULL(Q.OWN_AVG, 0) AS own_avg
+		       , ROUND((IFNULL(Q.SUM_MM, 0) / (SELECT SUM(A.REAL_MM)
+		                      		   		 FROM TB_STD_DAILY_PLAN A
+		                      		  		 JOIN (SELECT STD_ID
+		                                       			, RPT_SDT
+		                                       			, RPT_EDT
+		                          					 FROM TB_STD_RPT
+		                          				    WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+		                      		        	   ) B
+		                      		    	   ON B.STD_ID = A.STD_ID
+		                           			WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT)) * 100) AS sum_avg
+    		FROM (SELECT CODE
+			        FROM TB_CODE
+			       WHERE CODE_GRP_CD = 'SUBJECT_CD'
+			         AND USE_YN = 'Y'
+			         AND CODE <![CDATA[<>]]> 'CODE'
+			       ORDER BY CODE) TC
+			LEFT OUTER JOIN (SELECT C.SUBJECT_CD
+						          , SUM(C.HOME_ESTM_MM) AS HOME_ESTM_MM
+						          , SUM(C.HOME_REAL_MM) AS HOME_REAL_MM
+						          , ROUND((IFNULL(SUM(C.HOME_REAL_MM),0) / SUM(C.HOME_ESTM_MM)) * 100) AS HOME_AVG
+						          , SUM(C.OWN_ESTM_MM) AS OWN_ESTM_MM
+						          , SUM(C.OWN_REAL_MM) AS OWN_REAL_MM
+						          , ROUND((IFNULL(SUM(C.OWN_REAL_MM),0) / SUM(C.OWN_ESTM_MM)) * 100) AS OWN_AVG
+						          , IFNULL(SUM(C.HOME_REAL_MM),0) + IFNULL(SUM(C.OWN_REAL_MM),0) AS SUM_MM
+			         		   FROM (SELECT A.SUBJECT_CD
+							              , A.PLAN_TP
+							              , CASE WHEN A.PLAN_TP = '01' THEN SUM(A.ESTM_MM)
+							                     END AS HOME_ESTM_MM
+							              , CASE WHEN A.PLAN_TP = '01' THEN SUM(A.REAL_MM)
+							                     END AS HOME_REAL_MM
+							              , CASE WHEN A.PLAN_TP = '02' THEN SUM(A.ESTM_MM)
+							                     END AS OWN_ESTM_MM
+							              , CASE WHEN A.PLAN_TP = '02' THEN SUM(A.REAL_MM)
+							                     END AS OWN_REAL_MM
+									   FROM TB_STD_DAILY_PLAN A
+									   JOIN (SELECT STD_ID
+							                 	  , RPT_SDT
+							                 	  , RPT_EDT
+							    			   FROM TB_STD_RPT
+							    			  WHERE RPT_SEQ_ENC = #{rpt_seq_enc}
+									         ) B
+					    	   			 ON B.STD_ID = A.STD_ID
+			     					  WHERE A.ATD_DT BETWEEN B.RPT_SDT AND B.RPT_EDT
+			          				  GROUP BY A.SUBJECT_CD, A.PLAN_TP
+			          				  ) C
+			          			GROUP BY C.SUBJECT_CD
+			          	    ) Q
+			  ON Q.SUBJECT_CD = TC.CODE
+			LEFT OUTER JOIN (SELECT C.SUBJECT_CD
+                                  , SUM((HOUR(TIMEDIFF(A.OUT_TM, A.IN_TM))*60) + MINUTE(TIMEDIFF(A.OUT_TM, A.IN_TM)) + IFNULL(A.ADD_DTM, 0)) AS ACA_TOT_TM
+			                   FROM TB_STD_SCHD_ACA_DTL A
+			                   JOIN (SELECT *
+			          				   FROM TB_STD_RPT_SCHD_ACA
+			          				  WHERE RPT_SEQ = (SELECT RPT_SEQ
+			          						        	 FROM TB_STD_RPT A
+			          						        	WHERE A.RPT_SEQ_ENC = #{rpt_seq_enc})
+			          				 ) B
+			          			 ON B.STD_ID = A.STD_ID
+			          			 AND B.SCHD_NO = A.SCHD_NO
+			                   JOIN TB_STD_SCHD_ACA C
+			                     ON C.SCHD_NO = A.SCHD_NO
+			          			 AND C.STD_ID = A.STD_ID
+			                   GROUP BY C.SUBJECT_CD
+			                ) W
+			  ON W.SUBJECT_CD = TC.CODE
+		   ORDER BY TC.CODE
+	</select>
+	<select id="getSeatCnt" parameterType="hashMap" resultType="int">
+	/* CommonMapper.getSeatCnt */
+		SELECT IFNULL(MAX(SEAT_CNT), 0) AS SEAT_CNT
+		  FROM TB_CLASS_ROOM
+		 WHERE ACA_ID = #{aca_id}
+		   AND ROOM_NO = 1
+		   AND USE_YN = 'Y'
+	</select>
+	<select id="getSeatStatusInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		/* CommonMapper.getSeatStatusInfoRetrieve */
+		SELECT <choose>
+		       	 <when test="atd_seat_no_be != null">
+		        	#{atd_seat_no_be} AS seat_no
+		       	 </when>
+		       	 <otherwise>
+		        	LPAD(ATD.SEAT_NO, 2, '0') AS seat_no
+		         </otherwise>
+		       </choose>
+		       <choose>
+		       	 <when test="atd_room_no_be != null">
+		        	, #{atd_room_no_be} AS room_no
+		       	 </when>
+		       	 <otherwise>
+		        	, ATD.ROOM_NO AS room_no
+		         </otherwise>
+		       </choose>
+        	 , NVL(ATD.STD_ID, '-') AS std_id
+        	 , NVL(ATD.STD_NM, '공석') AS std_nm
+        	 , ATD.ATD_CHK_DTTM AS atd_chk_dttm
+        	 , ATD.IN_TM AS in_tm
+        	 , ATD.DUR_MM AS dur_mm
+        	 , CONCAT(TRUNCATE(DUR_MM / 60, 0), ' 시간 ', LPAD(MOD(DUR_MM, 60), 2, '0'), ' 분 경과') AS dur_tm
+        	   <choose>
+		       	 <when test="atd_seat_no_be != null">
+		        	, '2' AS curr_io_stat
+		       	 </when>
+		       	 <otherwise>
+		        	, ATR.ATD_IO AS curr_io_stat
+		         </otherwise>
+		       </choose>
+		       <choose>
+		       	 <when test="atd_seat_no_be != null">
+		        	, '01' AS atd_rsn_cd
+		       	 </when>
+		       	 <otherwise>
+		        	, ATR.ATD_RSN_CD AS atd_rsn_cd
+		         </otherwise>
+		       </choose>
+        	 , ATR.ATD_RSN_NM AS curr_io_rsn_nm
+        	 , DATE_FORMAT(ATR.ATD_DTTM , '%H:%i') AS last_io_tm
+        	 , CASE WHEN NVL(ATD.STD_ID, '-') = '-' THEN 0 ELSE FN_GET_STUDY_MM(DATE(NOW()), ATD.STD_ID) END AS study_mm
+        	 , CASE WHEN NVL(ATD.STD_ID, '-') = '-' THEN 0 ELSE FN_GET_STUDY_TM(DATE(NOW()), ATD.STD_ID) END AS study_tm
+        	 , CASE WHEN NVL(ATD.STD_ID, '-') = '-' THEN 0 ELSE  DATE_SUB(NOW(), INTERVAL NVL(FN_GET_STUDY_SEC(DATE(NOW()), ATD.STD_ID), 0) SECOND) END AS study_start_tms
+        	 , ATD.ACA_ID AS aca_id
+  		 FROM (SELECT T1.SEAT_NO
+                    , T1.STD_ID
+                    , T2.STD_NM
+                 	, T1.ATD_CHK_DTTM
+                 	, DATE_FORMAT(ATD_CHK_DTTM, '%H:%i') AS IN_TM
+                 	, TIMESTAMPDIFF(MINUTE, ATD_CHK_DTTM, NOW()) AS DUR_MM
+                 	, T2.ACA_ID AS ACA_ID
+                 	, T1.ROOM_NO
+           		 FROM TB_STD_ATD_LIB T1
+                 JOIN TB_STD_INFO T2
+                   ON T1.STD_ID = T2.STD_ID
+          	    WHERE T1.ACA_ID = #{aca_id}
+            	  AND T1.ATD_DT = (CASE WHEN DATE_FORMAT(NOW(), '%H%i') BETWEEN '0000' AND '0600' THEN DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 DAY), '%Y-%m-%d')
+                             			ELSE DATE_FORMAT(NOW(), '%Y-%m-%d')
+                             			END)
+            	  AND T1.STD_ID = #{std_id}
+     		   ) ATD
+        LEFT OUTER JOIN (SELECT T1.STD_ID
+                    		  , T1.ATD_IO
+                    		  , T1.ATD_RSN_CD
+                    		  , FC_GET_CODE_NM('ATD_RSN_CD', T1.ATD_RSN_CD) AS ATD_RSN_NM
+                    		  , T1.ATD_DTTM
+              			  FROM TB_STD_ATD_LIB_DTL T1
+                    	  JOIN (SELECT STD_ID
+                    	  			 , MAX(ATD_SEQ) AS ATD_SEQ
+                          		  FROM TB_STD_ATD_LIB_DTL
+                         		 WHERE ATD_DT = (CASE WHEN DATE_FORMAT(NOW(), '%H%i') BETWEEN '0000' AND '0600' THEN DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 DAY), '%Y-%m-%d')
+                                            		  ELSE DATE_FORMAT(NOW(), '%Y-%m-%d')
+                                            		  END)
+                         		 GROUP BY STD_ID
+                    	 		) T2
+         					ON T1.ATD_SEQ = T2.ATD_SEQ
+      					 WHERE T1.ATD_DT = (CASE WHEN DATE_FORMAT(NOW(), '%H%i') BETWEEN '0000' AND '0600' THEN DATE_FORMAT(DATE_ADD(NOW(), INTERVAL -1 DAY), '%Y-%m-%d')
+                              					 ELSE DATE_FORMAT(NOW(), '%Y-%m-%d')
+                              					 END)
+        				 ) ATR
+          ON ATD.STD_ID = ATR.STD_ID
+	</select>
+
+	<select id="getStudyPlanStdInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	/* CommonMapper.getStudyPlanStdInfo */
+		SELECT B.STD_NM AS std_nm
+			 , IFNULL(A.SEAT_NO, '') AS seat_no
+		     , DATE_FORMAT(A.ATD_CHK_DTTM, '%H:%i') AS in_tm
+		     , DATE_FORMAT(NOW(), '%Y년 %m월 %d일 %H:%i:%s') AS print_dt
+		     , C.ACA_NM AS aca_nm
+		     , DATE_FORMAT(A.ATD_DT, '%Y-%m-%d') AS atd_dt
+		  FROM TB_STD_ATD A
+		  JOIN TB_STD_INFO B
+		    ON B.STD_ID = A.STD_ID
+		  JOIN TB_ACA C
+		  	ON C.ACA_ID = B.ACA_ID
+	     WHERE A.STD_ID = #{std_id}
+	       AND A.ATD_DT = #{atd_dt}
+	</select>
+
+	<select id="getStudySchInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	/* CommonMapper.getStudySchInfo */
+		SELECT CONCAT(A.IN_TM, '~', A.OUT_TM) AS aca_tm
+		     , FC_GET_CODE_NM('SUBJECT_CD', B.SUBJECT_CD) AS subject_nm
+		     , B.ACA_NM AS aca_nm
+		  FROM TB_STD_SCHD_ACA_DTL A
+		  JOIN TB_STD_SCHD_ACA B
+		    ON B.SCHD_NO = A.SCHD_NO
+		    AND B.STD_ID = A.STD_ID
+		 WHERE A.STD_ID = #{std_id}
+		   AND A.DOW = DATE_FORMAT(#{atd_dt}, '%w')
+		 ORDER BY A.IN_TM
+	</select>
+	
+	<select id="getDailyPlanInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	/* mapper.getDailyPlanInfo */
+		SELECT SQL_CALC_FOUND_ROWS
+  		       A.RPT_SEQ AS rpt_seq
+  		     , A.RPT_GB AS rpt_gb
+  		     , CASE WHEN A.RPT_GB = 'DAY' THEN '일일레포트'
+  		      		WHEN A.RPT_GB = 'WEEK' THEN '주간레포트'
+  		       ELSE '' END AS rpt_gb_s		 
+  		     , A.STD_ID AS rpt_std_id
+			 , DATE_FORMAT(A.ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS rpt_ent_dttm
+			 , CASE WHEN A.RPT_EDT IS NULL THEN A.RPT_SDT
+			 		ELSE CONCAT(A.RPT_SDT, ' ~ ', A.RPT_EDT)
+			 		END AS rpt_period
+			 , CASE WHEN A.SMS_YN = 'Y' AND A.KAKAO_YN = 'Y' THEN 'S K'
+			 		WHEN A.SMS_YN = 'Y' AND A.KAKAO_YN = 'N' THEN 'S'
+			 		WHEN A.SMS_YN = 'N' AND A.KAKAO_YN = 'Y' THEN 'K'
+			 		WHEN A.SMS_YN = 'N' AND A.KAKAO_YN = 'N' THEN ''
+			 		ELSE ''
+			 		END AS rpt_send_yn
+			 , DATE_FORMAT(A.RPT_SDT, '%Y-%m-%d') AS rpt_sdt
+			 , DATE_FORMAT(A.RPT_EDT, '%Y-%m-%d') AS rpt_edt
+			 , A.MEMO AS rpt_memo
+			 , A.SMS_YN AS rpt_sms_yn
+			 , A.KAKAO_YN AS rpt_kakao_yn
+			 , A.PRT_CNT AS prt_cnt
+		     , A.ENT_USER_ID AS rpt_ent_user_id
+			 , DATE_FORMAT(A.UPT_DTTM, '%Y-%m-%d %H:%i:%s') AS rpt_upt_dttm
+		     , A.UPT_USER_ID AS rpt_upt_user_id
+		     , A.RPT_SEQ_ENC AS rpt_seq_enc
+		 FROM TB_STD_RPT A
+		 WHERE 1=1		  
+		   AND A.RPT_SEQ_ENC = #{rpt_seq_enc}
+				
+	</select>
+	
+	<select id="getDailyAcaTotalTime" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	/* mapper.getDailyAcaTotalTime */
+		SELECT  
+			A.STD_ID
+			, IFNULL(SUM(TIMESTAMPDIFF(MINUTE, time(IN_TM), time(OUT_TM))), 0) AS tm
+			
+		FROM TB_STD_SCHD_ACA AS A
+		LEFT OUTER JOIN TB_STD_SCHD_ACA_DTL AS B ON A.STD_ID = B.STD_ID AND A.SCHD_NO = B.SCHD_NO
+		LEFT OUTER JOIN TB_STD_RPT AS SR ON A.STD_ID = SR.STD_ID
+		WHERE 
+			SR.RPT_SEQ_ENC = #{rpt_seq_enc}
+		AND B.DOW = CASE WEEKDAY(NOW())
+			WHEN '0' THEN '1'
+			WHEN '1' THEN '2'
+			WHEN '2' THEN '3'
+			WHEN '3' THEN '4'
+			WHEN '4' THEN '5'
+			WHEN '5' THEN '6'
+			WHEN '6' THEN '0'
+		END
+	</select>
+	
+	<select id="getDailyAcaHomeworkTime" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	/* mapper.getDailyAcaHomeworkTime */
+		SELECT 
+			A.*
+		FROM
+			(
+			SELECT 
+			IFNULL(SUM(if(A.PLAN_TP = '01', real_mm, 0)), 0) AS 'aca_mm'
+			, IFNULL(SUM(if(A.PLAN_TP = '02', real_mm, 0)), 0) AS 'self_mm'
+			FROM
+			TB_STD_DAILY_PLAN AS A
+			LEFT OUTER JOIN TB_STD_RPT AS B ON A.STD_ID = B.STD_ID
+			WHERE B.RPT_SEQ_ENC = #{rpt_seq_enc} AND DATE_FORMAT(A.ATD_DT ,'%Y-%m-%d') = #{date}
+			) AS A	
+	</select>
+	
+	<select id="getDailyStdOutTime" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	/* mapper.getDailyStdOutTime */
+		SELECT 	
+			  AD.ATD_SEQ
+			, AD.ATD_IO
+			, AD.ATD_RSN_CD
+			, FC_GET_CODE_NM('ATD_RSN_CD', AD.ATD_RSN_CD) AS ATD_RSN_NM
+			, IFNULL(AD.ATD_RSN_DTL, '') AS ATD_RSN_DTL
+			, DATE_FORMAT(AD.ATD_DTTM, '%H:%i') AS STR_TM
+			, IFNULL(DATE_FORMAT(LEAD(AD.ATD_DTTM) OVER (ORDER BY AD.ATD_SEQ), '%H:%i'), '') AS END_TM 
+			, ATD_DTTM
+			, IFNULL(TIMESTAMPDIFF(MINUTE, AD.ATD_DTTM, LEAD(AD.ATD_DTTM) OVER (ORDER BY AD.ATD_SEQ)), 0) AS TIME_GAP
+			, CASE AD.ATD_RSN_CD WHEN '00' THEN 'Y'
+								 WHEN '51' THEN 'Y'
+		  	  ELSE 'N' END AS STAT
+		FROM TB_STD_ATD_LIB_DTL AD
+		LEFT OUTER JOIN TB_STD_RPT SR ON AD.STD_ID = SR.STD_ID
+		WHERE 
+			AD.ATD_DT = #{date}
+		AND SR.RPT_SEQ_ENC = #{rpt_seq_enc}
+	</select>
+	
+	
+	<select id="getDailyStudyPlan" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	/* mapper.getDailyStudyPlan */
+		SELECT 
+			A.*
+			, TP_CD.CODE_NM AS tp_nm
+			, SB_CD.CODE_NM AS sb_nm
+		FROM 
+			(SELECT 
+				A.STD_ID AS std_id
+				, A.PLAN_TP AS plan_tp
+				, A.SUBJECT_CD AS subject_cd
+				, A.PLAN_NM AS plan_nm
+				, A.RSLT_MEMO AS rslt_memo
+				, A.ESTM_MM AS estm_mm
+				, A.REAL_MM AS real_mm
+				, DATE_FORMAT(A.ATD_DT, '%Y-%m-%d') AS atd_dt
+				, CASE WHEN CMPL_YN = 'Y' THEN '완료'
+  				  ELSE '미완료' END AS cmpl
+  				, CASE WHEN CMPL_YN = 'Y' THEN '100%'
+  				  ELSE '미완료' END AS cmpl_per  
+				, A.UPT_DTTM 
+			 FROM 
+			TB_STD_DAILY_PLAN AS A
+			LEFT JOIN TB_STD_RPT AS B ON A.STD_ID = B.STD_ID
+			WHERE 
+				B.RPT_SEQ_ENC = #{rpt_seq_enc}
+			AND DATE_FORMAT(atd_dt ,'%Y-%m-%d') = #{date}
+			) AS A
+		LEFT OUTER JOIN TB_CODE AS TP_CD ON TP_CD.CODE = A.PLAN_TP AND TP_CD.CODE_GRP_CD = 'PLAN_TP'
+		LEFT OUTER JOIN TB_CODE AS SB_CD ON A.subject_cd = SB_CD.CODE AND SB_CD.CODE_GRP_CD = 'LIB_SUBJECT_CD'
+		ORDER BY
+			A.UPT_DTTM DESC
+	</select>
+	
+	<select id="getDailyStudyBookInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	/* mapper.getDailyStudyBookInfo */
+		SELECT a.*, sb_cd.CODE_NM AS sb_nm, tp_cd.CODE_NM AS tp_nm FROM
+		(
+			SELECT 
+				a.BOOK_CD AS book_cd
+				, a.STD_ID AS std_id
+				, a.STUDY_BOOK_TP AS study_book_tp
+				, a.SUBJECT_CD AS subject_cd
+				, a.BOOK_NM AS book_nm
+				, DATE_FORMAT(b.READ_SDT, '%Y-%m-%d') AS read_sdt
+				, a.TOTAL_READ_CNT AS total_read_cnt
+				, a.TOTAL_PAGE AS total_page
+				, b.CURR_PAGE AS curr_page
+				, CONCAT(ROUND(((b.CURR_PAGE / a.TOTAL_PAGE) * 100)), '%') AS per
+			FROM TB_STD_STUDY_BOOK AS a
+			LEFT OUTER JOIN TB_STD_STUDY_BOOK_READ AS b ON a.BOOK_CD = b.BOOK_CD
+			LEFT OUTER JOIN TB_STD_STUDY_BOOK_READ_LOG AS c ON b.BOOK_CD = c.BOOK_CD AND b.READ_TIMES = c.READ_TIMES  AND b.CURR_PAGE = c.END_PAGE
+			WHERE 
+				DATE_FORMAT(c.READ_DT, '%Y-%m-%d') = #{date}
+		) AS a
+		LEFT JOIN TB_STD_RPT AS b ON a.STD_ID = b.STD_ID 
+		LEFT OUTER JOIN TB_CODE AS sb_cd ON a.subject_cd = sb_cd.CODE AND sb_cd.CODE_GRP_CD = 'LIB_SUBJECT_CD'
+		LEFT OUTER JOIN TB_CODE AS tp_cd ON a.study_book_tp = tp_cd.CODE AND tp_cd.CODE_GRP_CD = 'STUDY_BOOK_TP'
+		WHERE 
+			b.RPT_SEQ_ENC = #{rpt_seq_enc}
+		ORDER BY a.book_cd DESC	
+	</select>
+
+	<select id="getEmpList" parameterType="hashMap" resultType="hashMap">
+	/* CommonMapper.getEmpList */
+		   SELECT T1.USER_ID AS teacher_id
+           		, T1.USER_NM AS teacher_nm
+  			 FROM TB_USER T1
+        	 JOIN TB_EMP T2
+        	   ON T2.EMP_ID = T1.USER_ID
+ 			WHERE T1.ACA_ID  = #{aca_id}
+   			  AND T1.USE_YN = 'Y'
+   			  AND T2.EMP_TP IN ('01', '02', '03')
+   			  <if test="emp_id != ''">
+   			  AND T1.USER_ID = #{emp_id}
+   			  </if>
+   			ORDER BY T1.USER_NM
+	 </select>
+
+	 <select id="getTeacherList" parameterType="hashmap" resultType="hashmap">
+	/* CommonMapper."getTeacherList" */
+           SELECT T1.USER_ID AS teacher_id
+           		, T1.USER_NM AS teacher_nm
+  			 FROM TB_USER T1
+        	 JOIN TB_EMP T2
+        	   ON T2.EMP_ID = T1.USER_ID
+        	 JOIN TB_USER_TP_AUTH_GRP T3
+        	   ON T3.USER_ID = T1.USER_ID
+               AND T3.AUTH_GRP_CD = 'AG0102'
+ 			WHERE T1.ACA_ID  = #{aca_id}
+   			  AND T1.USE_YN = 'Y'
+   			  AND T2.EMP_TP IN ('01', '02')
+   			  <if test="emp_id != ''">
+   			  AND T1.USER_ID = #{emp_id}
+   			  </if>
+	</select>
+	<select id="getPayCertificateInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.BOSS_NM AS boss_nm
+			 , T1.BIZ_NM AS biz_nm
+			 , T1.BIZ_NO AS biz_no
+			 , T1.TEL_NO AS tel_no
+			 , T1.ADDR AS addr
+			 , T1.ADDR_DTL AS addr_dtl
+			 , (SELECT STD_NM
+			 	FROM TB_STD_INFO
+			 	WHERE STD_ID = #{std_id}) AS std_nm
+		FROM TB_ACA T1
+		WHERE T1.ACA_ID = #{aca_id}
+	</select>
+	
+	<select id="getPayCertificateListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* CommonMapper.getPayCertificateListRetrieve */
+	SELECT
+		DATE_FORMAT(INV.LEARN_FDT, '%Y-%m') AS learn_ym -- 수강월
+		, DATE_FORMAT(PAY.SALES_DT, '%Y-%m-%d') AS pay_dt -- 납부일자
+		, PAY.PAY_AMT AS PAY_AMT -- 결제금액
+		, INV.INVOICE_NM AS invoice_nm -- 청구서명 -- 비고 (표현 안함)
+		, CONCAT( FC_GET_CODE_NM('PAY_TYPE', PAY.PAY_TYPE), CASE WHEN
+		NVL(PAY.PAY_CNT, 0) > 1 THEN CONCAT( ' 외', PAY.PAY_CNT -1) ELSE '' END) AS pay_tp_nm -- 결제유형
+	FROM
+		TB_INVOICE INV
+	LEFT OUTER JOIN 
+		(
+			SELECT
+				MAP.INVOICE_NO,
+				MAP.CORP_CD,
+				MAX(SM.SALES_DT) AS SALES_DT,
+				MAX(SM.PAY_TYPE) AS PAY_TYPE,
+				COUNT(DISTINCT SM.SALES_NO) AS PAY_CNT,
+				SUM(SM.TOT_AMT) AS PAY_AMT
+			FROM 
+				TB_INVOICE_CORP_PAY_MAP MAP
+			JOIN 
+				TB_SALES_MST SM ON SM.SALES_NO = MAP.SALES_NO AND SM.CORP_CD = MAP.CORP_CD
+			WHERE 
+				MAP.CORP_CD = #{aca_id}
+			GROUP BY MAP.INVOICE_NO , MAP.CORP_CD
+		) PAY ON PAY.INVOICE_NO = INV.INVOICE_NO
+	WHERE 
+		INV.ACA_ID = #{aca_id}
+		AND PAY.CORP_CD = INV.ACA_ID
+		AND INV.INVOICE_NO IN 
+		<foreach item="item" index="index" collection="invoice_nos" open="(" separator="," close=")">
+			#{item}
+		</foreach>
+	ORDER BY DATE_FORMAT(INV.LEARN_FDT, '%Y-%m')
+	</select>
+	
+	<select id="selectShuttleBusName" parameterType="hashMap" resultType="hashMap">
+	/* mapper.selectShuttleBusName */
+		SELECT
+			BUS_NO AS id
+			, BUS_NM AS text
+		FROM 
+			TB_BUS	
+		WHERE ACA_ID = #{aca_id}
+		<if test='stt_nm != null and stt_nm != ""'>
+			AND BUS_NM LIKE CONCAT('%',#{stt_nm},'%')
+		</if>
+		AND USE_YN = 'Y'
+				
+	</select>
+	
+	
+	<select id="selectDriverList" parameterType="hashMap" resultType="hashMap">
+	/* mapper.selectDriverList */
+		SELECT 			 
+			TU.USER_ID AS id
+			, CONCAT(TU.USER_NM, '(', TU.USER_ID, ')') AS text
+	  	FROM  TB_USER TU
+	  	JOIN TB_EMP TE ON  TU.USER_ID = TE.EMP_ID
+	     	AND TE.EMP_TP = '05'
+		WHERE  TU.USE_YN = 'Y'
+			AND  TU.USER_GB_CD = '01'
+			<if test='aca_id != null and aca_id != ""'>
+			AND  TU.ACA_ID = #{aca_id}
+			</if>
+			<if test='srch_driver_nm != null and srch_driver_nm != ""'>	   	  	
+	   	  	AND TU.USER_NM LIKE CONCAT('%',#{srch_driver_nm},'%')
+	   	  	</if>
+	</select>
+	
+	<select id="selectHelperList" parameterType="hashMap" resultType="hashMap">
+	/* mapper.selectHelperList */
+		SELECT 			 
+			TU.USER_ID AS id
+			, CONCAT(TU.USER_NM, '(', TU.USER_ID, ')') AS text
+	  	FROM  TB_USER TU
+	  	JOIN TB_EMP TE ON  TU.USER_ID = TE.EMP_ID
+	     	AND TE.EMP_TP = '01'
+		WHERE  TU.USE_YN = 'Y'
+			AND  TU.USER_GB_CD = '01'
+			<if test='aca_id != null and aca_id != ""'>
+			AND  TU.ACA_ID = #{aca_id}
+			</if>
+			<if test='srch_helper_nm != null and srch_helper_nm != ""'>	   	  	
+	   	  	AND TU.USER_NM LIKE CONCAT('%',#{srch_helper_nm},'%')
+	   	  	</if>
+	
+	</select>
+	
+	<select id="getSearchShuttleMst" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getSearchShuttleMst */
+		SELECT
+			BUS_LINE_NO AS bus_line_no
+			, BUS_LINE_NM AS bus_line_nm
+		FROM
+			TB_BUS_LINE_MST		
+		WHERE ACA_ID = #{aca_id}
+			AND USE_YN = 'Y'	
+	</select>
+	
+	<select id="getSearchShuttleSta" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getSearchShuttleSta */
+		SELECT 			
+			A.BUS_STATION_ID AS bus_sta_id
+			, B.STATION_NM AS bus_sta_nm			
+		FROM 
+			TB_BUS_LINE_MAP AS A 
+		LEFT JOIN 
+			TB_BUS_STATION AS B ON A.BUS_STATION_ID = B.BUS_STATION_ID
+		WHERE 
+			A.BUS_LINE_NO = #{bus_line_no} 
+		AND B.ACA_ID = #{aca_id}
+      ORDER BY A.ORD_NO ASC	
+	</select>
+	
+	<select id="getSearchShuttleArrTm" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getSearchShuttleArrTm */
+		SELECT 
+			A.BUS_SCHD_NO AS schd_no
+			, CONCAT(
+				CASE WHEN B.WDAY = '1' THEN '월요일'
+					  WHEN B.WDAY = '2' THEN '화요일'
+					  WHEN B.WDAY = '3' THEN '수요일'
+					  WHEN B.WDAY = '4' THEN '목요일'
+					  WHEN B.WDAY = '5' THEN '금요일'
+					  WHEN B.WDAY = '6' THEN '토요일'
+					  WHEN B.WDAY = '0' THEN '일요일'
+				END	  
+				, ' ' , A.ARRIVE_TM	  
+			) AS arr_tm
+		FROM 
+			TB_BUS_LINE_STATION AS A
+		LEFT JOIN 
+			TB_BUS_LINE_SCHEDULE AS B ON B.BUS_SCHD_NO = A.BUS_SCHD_NO 
+		WHERE 
+			A.BUS_STATION_ID = #{bus_sta_id} 
+			AND A.BUS_LINE_NO = #{bus_line_no} 
+			AND A.ARRIVE_TM IS NOT NULL
+	</select>
+	
+	<insert id="getStdReportCreate" parameterType="java.util.HashMap">
+	/* mapper.getStdReportCreate */
+		<selectKey keyProperty="rpt_seq" resultType="string" order="AFTER">
+			SELECT MAX(A.RPT_SEQ) AS rpt_seq
+			  FROM TB_STD_RPT A
+			 WHERE STD_ID = #{std_id}
+		</selectKey>
+		INSERT
+		  INTO TB_STD_RPT ( RPT_SEQ
+					      , RPT_GB					      
+					      , STD_ID
+					      , RPT_SDT
+					<choose>
+						<when test="rpt_edt != null">      
+					      , RPT_EDT
+					    </when>
+					</choose>      
+					      , MEMO
+					      , PRT_CNT
+					      , SMS_YN
+					      , KAKAO_YN
+					      , RPT_SEQ_ENC
+					      , ENT_DTTM
+					      , ENT_USER_ID
+					      , UPT_DTTM
+					      , UPT_USER_ID
+			  			  )
+			  		 SELECT (SELECT IFNULL(MAX(A.RPT_SEQ), 0) + 1 FROM TB_STD_RPT A) AS rpt_seq
+			  		 	  , #{rpt_gb}
+			  			  , #{std_id}			  			  
+					      , #{rpt_sdt}
+					<choose>
+						<when test="rpt_edt != null">
+						, #{rpt_edt}
+						</when>
+					</choose>							  
+						  , #{rpt_memo}
+						  , #{prt_cnt}
+						  , CASE WHEN #{rpt_sms_yn} = 'on' THEN 'Y' ELSE 'N' END
+						  , CASE WHEN #{rpt_kakao_yn} = 'on' THEN 'Y' ELSE 'N' END
+						  , TO_BASE64((SELECT IFNULL(MAX(B.RPT_SEQ), 0) + 1 FROM TB_STD_RPT B))
+						  , NOW()
+						  , #{ent_user_id}
+						  , NOW()
+				          , #{upt_user_id}
+				      FROM DUAL
+		
+	</insert>
+	
+	<insert id="rptSchdAcaCreate" parameterType="java.util.HashMap">
+	/* mapper.rptSchdAcaCreate */
+		INSERT
+		  INTO TB_STD_RPT_SCHD_ACA ( RPT_SEQ
+					      	   	   , STD_ID
+					      	   	   , SCHD_NO
+			  			       	   )
+			  		    	  SELECT #{rpt_seq}
+				  			 	   , STD_ID
+						     	   , SCHD_NO
+						       FROM TB_STD_SCHD_ACA
+						      WHERE STD_ID = #{std_id}
+						        AND ( (DATE(LERN_SDT) BETWEEN DATE(#{rpt_sdt}) AND DATE(#{rpt_edt}) OR IFNULL(DATE(LERN_EDT), NOW()) BETWEEN DATE(#{rpt_sdt}) AND DATE(#{rpt_edt}))
+				                    	  OR
+				                      (DATE(#{rpt_sdt}) BETWEEN DATE(LERN_SDT) AND IFNULL(DATE(LERN_EDT), NOW()) OR DATE(#{rpt_edt}) BETWEEN DATE(LERN_SDT) AND IFNULL(DATE(LERN_EDT), NOW()))
+				                    )
+						        AND SCHD_STATUS = '01'
+	
+	</insert>
+	
+	<insert id="rptSchdSchCreate" parameterType="java.util.HashMap">
+	/* mapper.rptSchdSchCreate */
+		INSERT
+		  INTO TB_STD_RPT_SCHD_SCHOOL ( RPT_SEQ
+							      	  , STD_ID
+							          , YEAR
+							          , SEASON_CD
+					  			      )
+			  		             SELECT #{rpt_seq}
+					  			      , STD_ID
+							          , YEAR
+								      , SEASON_CD
+				                   FROM TB_STD_SCHD_SCHOOL
+				                  WHERE STD_ID = #{std_id}
+				                    AND ( (DATE(SCHD_SDT) BETWEEN DATE(#{rpt_sdt}) AND DATE(#{rpt_edt}) OR DATE(SCHD_EDT) BETWEEN DATE(#{rpt_sdt}) AND DATE(#{rpt_edt}))
+				                    	  OR
+				                    	  (DATE(#{rpt_sdt}) BETWEEN DATE(SCHD_SDT) AND DATE(SCHD_EDT) OR DATE(#{rpt_edt}) BETWEEN DATE(SCHD_SDT) AND DATE(SCHD_EDT))
+				                    	)
+	
+	
+	</insert>
+	
+	<insert id="rptSchdEtcCreate" parameterType="java.util.HashMap">
+	/* mapper.rptSchdEtcCreate */
+		INSERT
+		  INTO TB_STD_RPT_SCHD_ETC ( RPT_SEQ
+						       	   , STD_ID
+						           , SCHD_NO
+					  		       )
+			  		        SELECT #{rpt_seq}
+					  		     , STD_ID
+							     , SCHD_NO
+				              FROM TB_STD_SCHD_ETC
+				             WHERE STD_ID = #{std_id}
+				               AND DATE(SCHD_SDT) BETWEEN DATE(#{rpt_sdt}) AND DATE(#{rpt_edt})
+				               AND SCHD_STATUS = '01'
+	
+	</insert>
+	
+	<select id="getRptParentId" parameterType="java.util.HashMap" resultType="String">
+	/* mapper.getRptParentId */
+		SELECT PARENT_ID
+	       FROM ( SELECT T.*
+	                   , (CASE @STD WHEN T.STD_ID THEN @rownum := @rownum+1 ELSE @rownum := 1 END) AS RNUM
+	                   , (@STD:=T.STD_ID) vjob
+	                FROM ( SELECT STD_ID
+	                            , PARENT_ID
+	                            , CASE WHEN REP_PARENT_YN = 'Y' THEN 1
+	                                   ELSE 2
+	                                   END AS ORD
+	                         FROM TB_PARENTS
+	                        WHERE STD_ID = #{std_id}
+	                       ) T
+	             		 , (SELECT @STD := '', @rownum:=0 FROM DUAL ) TD
+	       		  ORDER BY T.STD_ID, T.ORD
+	              ) T1
+	     WHERE RNUM = 1
+	
+	
+	</select>
+	
+	<select id="getRptSeqEnc" parameterType="java.util.HashMap" resultType="String">
+	/* mapper.getRptSeqEnc */
+		 SELECT RPT_SEQ_ENC AS rpt_seq_enc
+	       FROM TB_STD_RPT a
+	      WHERE RPT_SEQ = #{rpt_seq}
+	</select>
+	
+	<insert id="rptSmsInfoCreate" parameterType="java.util.HashMap">
+	/* mapper.rptSmsInfoCreate */
+		INSERT
+		  INTO TB_SMS (MT_TYPE
+		             , PHONE_NUMBER
+		             , CALLBACK
+		             , TITLE
+		             , MESSAGE
+		             , REQUEST_DATE
+		             , ACA_ID
+		             , STD_ID
+		             , ENT_USER_ID
+		             , STATUS
+		             , SMS_CONT_TP)
+			    SELECT #{rpt_mt_type}
+			 	     , (SELECT TU.HP_NO FROM TB_USER TU WHERE TU.USER_ID = #{parent_id})
+			 	     , (SELECT TA.TEL_NO FROM TB_ACA TA WHERE TA.ACA_ID = #{rpt_aca_id})
+			 	     , #{rpt_title}
+			 	     , #{rpt_sms_cnts}
+				     , DATE_FORMAT(NOW(), '%Y-%m-%d')
+				     , #{rpt_aca_id}
+				     , #{std_id}
+				     , #{ent_user_id}
+				     , '0'
+				     , #{rpt_sms_cont_tp}
+			      FROM DUAL
+
+	</insert>
+	
+	<select id="setBaseInfoClassEdt" parameterType="hashMap" resultType="string">
+	/* CommonMapper.setBaseInfoClassEdt */
+		SELECT FN_GET_CLASS_END_DATE(
+		#{aca_id}
+		, #{baseInfoClassSdt}
+		, #{wday}		
+		, ${classRound}) AS DT
+	</select>
+	
+	<select id="getInvoiceClassNm" parameterType="java.util.HashMap" resultType="java.lang.String">
+	/* CommonMapper.getInvoiceClassNm*/
+		SELECT
+			CLASS_NM
+		FROM
+			TB_CLASS
+		WHERE
+			CLASS_CD = (SELECT CLASS_CD FROM TB_INVOICE WHERE INVOICE_NO = #{invoiceNo})	
+	</select>
+	
+	<select id="selectInvoiceUnpayStdList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	/* CommomMapper.selectInvoiceUnpayStdList */
+		SELECT
+			SQL_CALC_FOUND_ROWS
+			A.STD_ID AS std_id
+			, A.ACA_ID AS aca_id
+			, A.STD_NM AS std_nm
+			, A.PARENT_TEL AS parent_tel			
+			, A.UNPAY_CNT AS unpay_cnt
+			, IFNULL(A.UNPAY_AMT, 0) AS unpay_amt
+		FROM 
+		(
+		SELECT 
+			TSI.STD_ID AS STD_ID
+			, TSI.ACA_ID AS ACA_ID
+			, TSI.STD_NM AS STD_NM
+			, TU.USER_ID AS PARENT_ID
+			, TU.HP_NO AS PARENT_TEL
+			, COUNT(TI.STD_ID) AS UNPAY_CNT
+			, IFNULL(SUM(TI.TOT_AMT), 0) AS UNPAY_AMT
+		FROM 
+			TB_INVOICE AS TI
+		JOIN 
+			TB_STD_INFO TSI ON TSI.STD_ID = TI.STD_ID AND FN_GET_ACA_STD_STATUS(TSI.ACA_ID, TSI.STD_ID) IN ('01', '04', '06', '07')
+		LEFT OUTER JOIN 
+			TB_PARENTS AS TP ON TP.STD_ID = TSI.STD_ID AND TP.REP_PARENT_YN = 'Y'	
+		JOIN 
+			TB_USER AS TU ON TU.USER_ID = TP.PARENT_ID	
+		WHERE
+			TI.PAY_YN IN ('N', 'P')
+			<if test='aca_id != "AC00001"'>
+			AND TI.ACA_ID = #{aca_id}
+			</if>
+			AND TI.RECV_LIMIT_DT >= DATE_FORMAT(NOW(), '%Y-%m-%d')
+		GROUP BY TI.STD_ID
+		) AS A
+		WHERE
+			1=1
+			AND A.UNPAY_AMT > 0
+		LIMIT ${start}, ${end}	
+	</select>
+	
+	<select id="getStdinfo" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getStdinfo */
+		SELECT
+			STD_ID AS std_id
+			, STD_NM AS std_nm
+			, IFNULL(SCH_NM, '') AS sch_nm
+		FROM
+			TB_STD_INFO
+		WHERE
+			STD_ID = #{stdId}	
+	</select>
+	
+	<select id="getSelectStdTrialExamCharts" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getSelectStdTrialExamCharts */
+		SELECT 
+			A.EXAM_NO AS exam_no
+			, B.EXAM_NM AS exam_nm
+			, A.PERCENTILE1 AS percentile1
+			, A.PERCENTILE2 AS percentile2
+			, ((A.PERCENTILE5 + A.PERCENTILE6) / 2) AS percentile5
+			, A.EXAM_AREA AS exam_area
+			, A.EXAM_PERCENTILE AS exam_percentile
+			, A.EXAM_TOTAL_SCORE AS exam_total_score
+			, A.EXAM_AVG_SCORE AS exam_avg_score
+		FROM 
+			TB_EXAM_TRIAL_RSLT AS A
+		JOIN 
+			TB_EXAM AS B ON A.EXAM_NO = B.EXAM_NO
+		WHERE
+			A.STD_ID = #{std_id}	
+			AND B.EXAM_DT BETWEEN DATE(CONCAT(DATE_FORMAT(NOW(), '%Y'), '-01-01'))
+            AND DATE(CONCAT(DATE_FORMAT(NOW(), '%Y'), '-12-31'))
+			AND B.USE_YN = 'Y'
+		ORDER BY 
+			B.ENT_DTTM ASC	
+	</select>
+	
+	<select id="getSelectStdTrialExamList" parameterType="java.lang.String" resultType="java.util.HashMap">
+	/* CommonMapper.getSelectStdTrialExamList */
+		SELECT
+			A.EXAM_NO AS exam_no
+			, B.EXAM_NM AS exam_nm
+			, A.STD_ID AS std_id
+			, A.STD_NM AS std_nm
+
+			, IFNULL(A.SUBJECT1, '-') AS subject1
+			, IFNULL(A.SELECT_SUBJECT1, '-') AS select_subject1
+			, IFNULL(A.COMM_SCORE1, 0) AS COMM_SCORE1
+			, IFNULL(A.SELECT_SCORE1, 0) AS select_score1
+			, IFNULL(A.TOTAL_SCORE1, 0) AS total_score1
+			, IFNULL(A.AVG_SCORE1, 0) AS avg_score1
+			, IFNULL(A.PERCENTILE1, 0) AS percentile1
+			, IFNULL(A.GRADE1, '-') AS grade1
+
+			, IFNULL(A.SUBJECT2, '-') AS subject2
+			, IFNULL(A.SELECT_SUBJECT2, '-') AS select_subject2
+			, IFNULL(A.COMM_SCORE2, 0) AS comm_score2
+			, IFNULL(A.SELECT_SCORE2, 0) AS select_score2
+			, IFNULL(A.AVG_SCORE2, 0) AS avg_score2
+			, IFNULL(A.PERCENTILE2, 0) AS percentile2
+			, IFNULL(A.GRADE2, '-') AS grade2
+
+			, IFNULL(A.SUBJECT3, '-') AS subject3
+			, IFNULL(A.TOTAL_SCORE3, 0) AS total_score3
+			, IFNULL(A.GRADE3, '-') AS grade3
+
+			, IFNULL(A.SUBJECT4, '-') AS subject4
+			, IFNULL(A.TOTAL_SCORE4, 0) AS total_score4
+			, IFNULL(A.GRADE4, '-') AS grade4
+
+			, IFNULL(A.SUBJECT5, '-') AS subject5
+			, IFNULL(A.SELECT_SUBJECT5, '-') AS select_subject5
+			, IFNULL(A.TOTAL_SCORE5, 0) AS total_score5
+			, IFNULL(A.AVG_SCORE5, 0) AS avg_score5
+			, IFNULL(A.PERCENTILE5, 0) AS percentile5
+			, IFNULL(A.GRADE5, '-') AS grade5
+
+			, IFNULL(A.SUBJECT6, '-') AS subject6
+			, IFNULL(A.SELECT_SUBJECT6, '-') AS select_subject6
+			, IFNULL(A.TOTAL_SCORE6, 0) AS total_score6
+			, IFNULL(A.AVG_SCORE6, 0) AS avg_score6
+			, IFNULL(A.PERCENTILE6, 0) AS percentile6
+			, IFNULL(A.GRADE6, '-') AS grade6
+
+			, IFNULL(A.SELECT_TOTAL_SCORE, 0) AS select_total_score
+			, IFNULL(A.SELECT_AVG_SCORE, 0) AS select_avg_score
+			, IFNULL(A.SELECT_PERCENTILE, 0) AS select_percentile
+			, IFNULL(A.SELECT_GRADE, '-') AS select_grade 
+
+			, IFNULL(A.SUBJECT7, '-') AS subject7
+			, IFNULL(A.SELECT_SUBJECT7, '-') AS select_subject7
+			, IFNULL(A.TOTAL_SCORE7, 0) AS total_score7
+			, IFNULL(A.AVG_SCORE7, 0) AS avg_score7
+			, IFNULL(A.PERCENTILE7, 0) AS percentile7
+			, IFNULL(A.GRADE7, '-') AS grade7
+
+			, IFNULL(A.EXAM_AREA, '-') AS exam_area
+			, IFNULL(A.EXAM_TOTAL_SCORE, 0) AS exam_total_score
+			, IFNULL(A.EXAM_AVG_SCORE, 0) AS exam_avg_score
+			, IFNULL(A.EXAM_PERCENTILE, 0) AS exam_percentile
+			, IFNULL(A.EXAM_AVG_GRADE, '-') AS exam_avg_grade
+
+			, IFNULL(A.CLASS_RANK, '') AS class_rank
+			, IFNULL(A.ACADEMY_RANK, '') AS academy_rank
+			, IFNULL(A.TOTAL_RANK, '') AS total_rank
+		FROM
+			TB_EXAM_TRIAL_RSLT AS A
+		JOIN 
+			TB_EXAM AS B ON A.EXAM_NO = B.EXAM_NO
+		WHERE 1=1
+			AND A.STD_ID = #{stdId}
+			AND B.EXAM_DT BETWEEN DATE(CONCAT(DATE_FORMAT(NOW(), '%Y'), '-01-01'))
+            AND DATE(CONCAT(DATE_FORMAT(NOW(), '%Y'), '-12-31'))
+			AND B.USE_YN = 'Y'
+	</select>
+
+	<select id="getStdReportInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* DayLearnReportMngMapper.getStdReportInfoRetrieve */
+		SELECT
+			   TSI.STD_ID AS std_id
+			 , TSI.ACA_ID AS aca_id
+			 , TSI.STD_NM AS std_nm
+			 , CONCAT(TSI.SCH_NM, ' ', FC_GET_CODE_NM('SCH_LVL', TSI.SCH_LVL)) AS sch_nm
+		     , RSD.RPT_SEQ AS rpt_seq
+		     , CAST(RSD.ATD_DT AS char) AS atd_dt
+		     , RSD.CLASS_CD AS class_cd
+		     , RSD.TTIME AS ttime
+		     , RSD.UNDERSTAND AS understand
+		     , RSD.SPEACH AS speach
+		     , RSD.SERMON AS sermon
+		     , RSD.OPINION AS opinion
+		     , RSD.MANNER AS manner
+		     , RSD.SENT_EXP AS sent_exp
+		     , RSD.SENT_LOGIC AS sent_logic
+		     , RSD.MENT AS ment
+		     , RSD.RPT_SEQ_ENC AS rpt_seq_enc
+	  	FROM
+		  	TB_STD_INFO TSI
+		LEFT OUTER JOIN
+					(SELECT
+							   RPT_SEQ
+							 , ATD_DT
+		                     , STD_ID
+							 , CLASS_CD
+							 , TTIME
+							 , UNDERSTAND
+							 , SPEACH
+							 , SERMON
+							 , OPINION
+							 , MANNER
+							 , SENT_EXP
+							 , SENT_LOGIC
+							 , MENT
+							 , RPT_SEQ_ENC
+						FROM
+							TB_RPT_STD_DEBATE
+	            		WHERE
+	            			RPT_SEQ_ENC = #{rpt_seq_enc}
+		            ) RSD ON RSD.STD_ID = TSI.STD_ID
+		WHERE
+			RSD.RPT_SEQ_ENC = #{rpt_seq_enc}
+	</select>
+
+	<select id="getTestStdReportInfo" parameterType="String" resultType="hashMap">
+	/* CommonMngMapper.getStdReportInfoRetrieve */
+		select
+			  rpt.id as rpt_id
+			, wp.user_login as std_id
+		from
+			classin_kdebate_web.wp_aysquiz_reports rpt
+		join
+			classin_kdebate_web.wp_users wp on wp.id = rpt.user_id
+		where rpt.unique_code = #{unique_code}
+	</select>
+	
+	<select id="getSelectAgeOfDate" parameterType="java.util.HashMap" resultType="java.lang.String">
+	/* CommonMapper.getSelectAgeOfDate */
+		SELECT FN_GET_BIRTH_AGE(#{date}, '')
+	</select>
+	
+</mapper>

@@ -1,0 +1,3264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.web.kdebate.student.students.mapper.StudentInfoMngMapper">
+
+	<select id="getQueryTotalCnt" resultType="int">
+		SELECT FOUND_ROWS()
+	</select>
+
+    <select id="getSchdYearList" resultType="string">
+    /* StudentMngMapper.getSchdYearList */
+	    SELECT DISTINCT(YEAR(DATE)) AS schd_year
+	      FROM TB_CALENDAR
+	     ORDER BY DATE
+	</select>
+
+	<select id="getInvoicePayCheck" parameterType="string" resultType="int">
+    /* StudentMngMapper.getInvoicePayCheck */
+	    SELECT COUNT(1)getStdPrevInvRetrieve
+	      FROM TB_INVOICE
+	     WHERE INVOICE_NO = #{invoice_no}
+	       AND PAY_YN = 'Y'
+	</select>
+
+	<select id="getMngClassList" parameterType="hashMap" resultType="hashMap">
+	/* StudentInfoMngMapper.getMngClassList */
+		SELECT TAC.CLASS_CD AS class_cd
+			 , CASE WHEN TAC.ACA_ID = #{my_aca_id} OR TAC.ACA_ID = #{aca_id} THEN TAC.CLASS_NM
+			 		ELSE CONCAT(TAC.CLASS_NM, ' (', TA.ACA_NM , ')')
+				END AS class_nm
+  		  FROM TB_ACA_CLASS TAC
+		  <choose>
+		  	<when test='p_aca_id != null and p_aca_id != ""'>
+				JOIN VW_MY_ACA_LIST TA ON TA.ACA_ID = TAC.ACA_ID
+										AND TA.MY_ACA_ID = #{my_aca_id}
+			</when>
+			<otherwise>
+				JOIN TB_ACA TA ON TA.ACA_ID = TAC.ACA_ID
+			</otherwise>
+		  </choose>
+         WHERE 1=1
+		   <if test='aca_id != null and aca_id != ""'>
+		   		AND TAC.ACA_ID = #{aca_id}
+		   </if>
+           AND TAC.USE_YN = 'Y'
+         ORDER BY CASE WHEN TAC.ACA_ID = #{my_aca_id} THEN 0 ELSE TAC.ACA_ID END, TAC.CLASS_NM
+	</select>
+	
+	<select id="getCnslUserListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentInfoMngMapper.getCnslUserListRetrieve */
+		SELECT DISTINCT
+			  TU.USER_ID AS cnsl_user_id
+			, CASE WHEN MAL.ACA_ID = MAL.MY_ACA_ID
+					THEN CONCAT(TU.USER_NM, ' (', TU.USER_ID ,')')
+					ELSE CONCAT(TU.USER_NM, ' (', MAL.ACA_NM, ' - ', TU.USER_ID, ')')
+				END AS cnsl_user_nm
+		FROM
+			TB_USER TU
+		JOIN
+			VW_MY_ACA_LIST MAL ON MAL.ACA_ID = TU.ACA_ID
+								AND MAL.MY_ACA_ID = #{aca_id}
+		JOIN
+			TB_EMP TE ON TE.EMP_ID = TU.USER_ID
+		LEFT JOIN
+			TB_EMP_WORK TEW ON TEW.EMP_ID = TE.EMP_ID
+			AND TEW.WORK_CD IN('01', '02')
+		WHERE 1=1
+		AND
+			TU.USE_YN = 'Y'
+		AND
+			TU.USER_GB_CD = '01'
+		AND
+			TE.EMP_TP IN('01', '02', '03', '08', '09')
+		AND EXISTS (
+				SELECT 1
+				FROM TB_USER_TP_AUTH_GRP
+				WHERE AUTH_GRP_CD = 'AG0101'
+			)
+		GROUP BY
+			TU.USER_ID
+		ORDER BY
+			MAL.SEQ, TU.USER_NM
+	</select>
+
+	<select id="getCorpListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getCorpListRetrieve */
+		SELECT T1.CORP_CD AS corp_cd
+		     , SC.CORP_NM AS corp_nm
+		     , SC.USE_YN AS corp_use_yn
+		     , SC.AUTH_YN AS corp_auth_yn
+		     , SC.COMM_YN AS corp_comm_yn
+  		  FROM TB_ACA_SALES_CORP T1
+          JOIN TB_SALES_CORP SC
+            ON T1.CORP_CD = SC.CORP_CD
+         WHERE (T1.ACA_ID = #{aca_id} OR SC.COMM_YN = 'Y')
+         ORDER BY T1.CORP_CD
+	</select>
+
+	<select id="getGoodsListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getGoodsListRetrieve */
+		SELECT A.GOODS_CD AS goods_cd
+			 , A.GOODS_NM AS goods_nm
+			 , A.PRICE AS goods_price
+			 , CASE WHEN B.CORP_TP = '00' THEN 'N'
+              		ELSE 'Y'
+              		END AS dc_tp_yn
+             , A.TOT_AMT AS goods_amt
+             , A.SET_ITEM_CHK AS goods_set_item
+             , A.GOODS_TP AS goods_tp
+             , A.USE_YN AS goods_use_yn
+             , A.GOODS_PAY_DIV_CHK AS goods_pay_div_chk
+			 , A.GOODS_PAY_CALC_TP AS goods_pay_calc_tp
+			 , A.GOODS_PAY_CALC_VAL AS goods_pay_calc_val
+		  FROM TB_CORP_GOODS A
+		  LEFT OUTER JOIN TB_SALES_CORP B
+        	ON A.CORP_CD = B.CORP_CD
+		 WHERE 1=1
+		   AND ((A.CORP_CD = "AC00001" AND A.GOODS_PAY_DIV_CHK = "N") OR (A.CORP_CD != "AC00001"))
+		   AND A.CORP_CD = #{corp_cd}
+		   AND A.USE_YN = 'Y'
+		   <if test="goods_cd != '' and goods_cd != null">
+		   AND A.GOODS_CD = #{goods_cd}
+		   </if>
+		   <choose>
+		    <when test="goods_tp != '' and goods_tp != null">
+		    	AND A.GOODS_TP = #{goods_tp}
+		    	<if test="goods_tp.equals('01')">
+		    	AND A.GOODS_CD LIKE '10%'
+		    	</if>
+		   	</when>
+		   	<otherwise>
+		   		AND A.GOODS_TP NOT IN ("01", "11")
+		   	</otherwise>
+		   </choose>
+		 ORDER BY A.GOODS_CD
+	</select>
+
+	<update id="studentInfoUpdate" parameterType="hashMap">
+	/* StudentMngMapper.studentInfoUpdate */
+		UPDATE TB_STD_INFO
+		   SET STD_NM = TRIM(#{std_nm})
+		   	 , BIRTH = #{birth}
+		   	 , SCH_LVL = #{sch_lvl}
+ 		   	 , STD_GB_TXT = #{std_gb_txt}
+		   	 , MEMO = #{std_memo}
+		   	 , CLS = #{std_sch_cls}
+		   	 , NICK_NM = #{nick_nm}
+		   	 , STD_URL = #{std_url}
+		   	 <if test="std_mng_file != '' and std_mng_file != null">
+		   	 , STD_MNG_FILE = #{std_mng_file}
+		   	 </if>
+		   	 , DC_YN = #{dc_yn}
+		   	 <if test='dc_cd != null'>
+		   	 , DC_CD = #{dc_cd}
+		   	 </if>
+		   	 <if test='dc_tp != null'>
+		   	 , DC_TP = #{dc_tp}
+		   	 </if>
+		   	 <if test='dc_amt != null'>
+		   	 , DC_AMT = #{dc_amt}
+		   	 </if>
+		   	 <if test='std_lvl_cd != null'>
+		   	 , LVL = #{std_lvl_cd}
+		   	 </if>
+		   	 , CASH_REG_NO = #{cash_reg_no}
+		   	 , CASH_REG_NO_CORP = #{cash_reg_no_corp}
+		   	 , ATD_SEND_YN = CASE WHEN #{atd_sms_yn} = 'on' THEN 'Y' ELSE 'N' END
+		   	 , LEV_SEND_YN = CASE WHEN #{lev_sms_yn} = 'on' THEN 'Y' ELSE 'N' END
+		   	 , EXAM_SEND_YN = CASE WHEN #{exam_sms_yn} = 'on' THEN 'Y' ELSE 'N' END
+		   	 , AUTO_INV_YN = CASE WHEN #{std_auto_pay} = 'on' THEN 'Y' ELSE 'N' END
+		   	 , MGT_CLS = #{std_mgt_cls}
+		   	 , MGT_NUM = #{std_mgt_num}
+		   	 , ATD_CHK_CD = #{atd_chk_cd}
+		   	 , RESV_SEAT_YN = #{class_seat_yn}
+		   	 , RESV_SEAT_ROOM_NO = #{class_room}
+		   	 , RESV_SEAT_NO = #{room_seat_no}
+		   	 , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		     , STUDY_LIVE_CHK = CASE WHEN #{study_live_chk} = 'Y' THEN 'Y' ELSE 'N' END
+		   	 , STUDY_CARE_CHK = CASE WHEN #{study_care_chk} = 'Y' THEN 'Y' ELSE 'N' END
+		 WHERE STD_ID = #{std_id}
+	</update>
+
+	<update id="userInfoUpdate" parameterType="hashMap">
+	/* StudentMngMapper.userInfoUpdate */
+		UPDATE TB_USER
+		   SET TEL_NO = #{tel_no}
+		   	 , HP_NO = #{hp_no}
+		   	 , EMAIL = #{email}
+		   	 , ZIP_CODE = #{zip_code}
+		   	 , ADDR = #{addr}
+		   	 , ADDR_DTL = #{addr_dtl}
+		   	 , USER_NM = TRIM(#{std_nm})
+		   	 , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		     <if test="cnct_pwd != ''">
+		     , USER_PWD = PASSWORD(#{cnct_pwd})
+		     </if>
+		 WHERE USER_ID = #{std_id}
+	</update>
+
+	<update id="studyLinckInfoUpdate" parameterType="hashMap">
+	/* StudentMngMapper.studyLinckInfoUpdate */
+		UPDATE TB_STUDY_LINK
+		   SET CNCT_PWD = #{cnct_pwd}
+		 WHERE STD_ID = #{std_id}
+	</update>
+
+	<update id="stdMemoUpdate" parameterType="hashMap">
+	/* StudentMngMapper.stdMemoUpdate */
+		UPDATE TB_STD_INFO
+		   SET MEMO = #{std_memo}
+		 WHERE STD_ID = #{memo_std_id}
+	</update>
+
+	<update id="parentUserInfoUpdate" parameterType="hashMap">
+	/* StudentMngMapper.parentUserInfoUpdate */
+		UPDATE TB_USER
+		   SET ZIP_CODE = #{zip_code}
+		     , ADDR = #{addr}
+		     , ADDR_DTL = #{addr_dtl}
+		     , HP_NO = #{parent_hp_no}
+		     , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		 WHERE USER_ID = #{rep_parent_id}
+	</update>
+
+	<insert id="stdParentInfoCreate" parameterType="hashMap">
+	/* StudentMngMapper.stdParentInfoCreate */
+		INSERT
+		  INTO TB_USER ( USER_ID
+				       , ACA_ID
+				       , USER_PWD
+		           	   , USER_NM
+		               , USER_GB_CD
+		               , HP_NO
+		               , ZIP_CODE
+		               , ADDR
+		               , ADDR_DTL
+		               , USE_YN
+		               , ENT_DTTM
+		               , ENT_USER_ID
+		               , UPT_DTTM
+		               , UPT_USER_ID
+			  		   )
+		  		 SELECT 
+		  		 	  REPLACE(#{parent_id}, '-', '')
+		  		      , (SELECT B.ACA_ID FROM TB_USER B WHERE B.USER_ID = #{std_id})
+				      , CASE WHEN #{parent_hp_no} != '' THEN PASSWORD(RIGHT(#{parent_hp_no}, 4)) ELSE PASSWORD('1234') END
+				      , CONCAT(#{std_nm}, " 부모")
+				      , '03'
+				      , #{parent_hp_no}
+				      , #{zip_code}
+					  , #{addr}
+					  , #{addr_dtl}
+				      , 'Y'
+					  , NOW()
+					  , #{upt_user_id}
+					  , NOW()
+			          , #{upt_user_id}
+			      FROM DUAL
+	</insert>
+
+	<insert id="stdParentCreate" parameterType="hashMap">
+	/* StudentMngMapper.stdParentCreate */
+		<selectKey keyProperty="rep_parent_yn" resultType="string" order="BEFORE">
+			SELECT 
+				CASE WHEN 0 <![CDATA[<]]> COUNT(*) THEN 'N' ELSE 'Y' END
+			FROM TB_PARENTS
+			WHERE STD_ID = #{std_id}
+			AND REP_PARENT_YN = 'Y'
+		</selectKey>
+		
+		INSERT
+		  INTO TB_PARENTS ( PARENT_ID
+				          , STD_ID
+				          , PARENT_GB_CD
+				          , REP_PARENT_YN
+						  , SMS_CONT
+				          , ENT_DTTM
+			              , ENT_USER_ID
+			              , UPT_DTTM
+			              , UPT_USER_ID
+			  			  )
+		  		   SELECT
+		  		   		REPLACE(#{parent_id}, '-', '')
+		  		    	, #{std_id}
+				       	, "01"
+				       	, #{rep_parent_yn}
+						, CASE WHEN #{rep_parent_yn} = 'Y'
+							   THEN #{sms_cont_tp}
+							ELSE '' END
+					    , NOW()
+					    , #{upt_user_id}
+					    , NOW()
+			        	, #{upt_user_id}
+			        FROM DUAL
+	</insert>
+	
+	<delete id="cParentDelete" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* StudentMngMapper.cParentDelete */
+		DELETE FROM TB_PARENTS
+		WHERE
+			STD_ID = #{parent_reg_std_id}
+		AND
+			PARENT_ID = #{parent_prev_user_id}
+	</delete>
+	
+	<insert id="cParentCreate" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* StudentMngMapper.cParentCreate */
+		INSERT
+		  INTO TB_PARENTS ( PARENT_ID
+				          , STD_ID
+				          , PARENT_GB_CD
+				          , REP_PARENT_YN
+				          , ENT_DTTM
+			              , ENT_USER_ID			             
+			  			  )
+		  		   SELECT 
+		  		   		  #{parent_reg_user_id}
+		  		    	, #{parent_reg_std_id}
+				       	, #{parent_reg_gb_cd}
+				       	, CASE WHEN (SELECT COUNT(*)
+									  FROM TB_PARENTS
+									 WHERE STD_ID = #{parent_reg_std_id}
+									   AND REP_PARENT_YN = 'Y') = 0 THEN 'Y'
+							   ELSE 'N'
+						  END AS REP_PARENT_YN
+					    , NOW()
+					    , #{ent_user_id}					    
+			        FROM DUAL
+		ON DUPLICATE KEY UPDATE
+			  UPT_DTTM = NOW()
+		    , UPT_USER_ID = #{upt_user_id}	        
+	</insert>
+
+	<insert id="stdInfoSmsCreate" parameterType="hashMap">
+	/* StudentMngMapper.stdInfoSmsCreate */
+		INSERT INTO TB_SMS
+			  ( MT_TYPE
+			  , PHONE_NUMBER
+			  , CALLBACK
+			  , TITLE
+			  , MESSAGE
+			  , REQUEST_DATE
+			  , ACA_ID
+			  , STD_ID
+			  , ENT_USER_ID
+			  , SMS_CONT_TP
+			  , STATUS
+			  )
+		SELECT #{mt_type}
+			 , #{parent_hp_no}
+			 , (SELECT TA.TEL_NO FROM TB_ACA TA WHERE TA.ACA_ID = #{aca_id})
+			 , #{title}
+			 , #{cnts}
+			 , DATE_FORMAT(NOW(), '%Y-%m-%d')
+			 , #{aca_id}
+			 , #{std_id}
+			 , #{upt_user_id}
+			 , #{sms_cont_tp}
+			 , '0'
+		FROM DUAL
+	</insert>
+
+	<select id="stdClassChk" parameterType="hashMap" resultType="int">
+	/* StudentMngMapper.stdClassChk */
+		SELECT COUNT(1)
+		  FROM TB_STD_CLASS
+		 WHERE STD_ID = #{std_id}
+	</select>
+
+	<delete id="stdClassDelete" parameterType="hashMap">
+	/* StudentMngMapper.stdClassDelete */
+		DELETE FROM TB_STD_CLASS
+		 WHERE STD_ID = #{std_id}
+	</delete>
+
+	<insert id="stdClassCreate" parameterType="hashMap">
+	/* StudentMngMapper.stdClassCreate */
+		INSERT INTO TB_STD_CLASS
+					( STD_ID
+					, CLASS_CD
+					, USE_YN
+					, ENT_DTTM
+					, ENT_USER_ID
+					, UPT_DTTM
+					, UPT_USER_ID
+					)
+			 VALUES ( #{std_id}
+			 	    , #{mng_class_cd}
+			 	    , 'Y'
+			 	    , NOW()
+			 	    , #{upt_user_id}
+			 	    , NOW()
+			 	    , #{upt_user_id}
+			 	    )
+	</insert>
+	
+	<select id="getParentExistConfirm" parameterType="java.util.HashMap" resultType="int">
+	/* StudentInfoMngMapper.getParentExistConfirm */
+		SELECT
+			COUNT(1)
+		FROM
+			TB_PARENTS
+		WHERE
+			STD_ID = #{std_id}
+			AND REPLACE(PARENT_ID, '-', '') = REPLACE(#{parent_hp_no}, "-", "")		
+	</select>
+
+	<select id="getParentHpNoConfirm" parameterType="hashMap" resultType="int">
+	/* StudentMngMapper.getParentHpNoConfirm */
+		SELECT COUNT(1)
+		  FROM TB_USER
+		 WHERE USER_GB_CD = '03'
+		   AND REPLACE(HP_NO, '-', '') = REPLACE(#{parent_hp_no}, "-", "")
+	</select>
+	
+	<select id="getParentInfo" parameterType="HashMap" resultType="HashMap">
+	/* StudentInfoMngMapper.getParentInfo */
+		SELECT 
+			T1.USER_ID AS parent_id
+		    , T1.USER_NM AS parent_nm
+		    , T1.HP_NO AS parent_hp_no
+		FROM 
+			TB_USER T1
+		WHERE 
+			1=1
+		   	AND USER_GB_CD = '03'
+		   	AND REPLACE(T1.HP_NO, '-', '') = REPLACE(#{parent_hp_no}, '-', '')
+	</select>
+
+	<select id="getStdAtdCdConfirm" parameterType="hashMap" resultType="int">
+	/* StudentMngMapper.getStdAtdCdConfirm */
+		SELECT COUNT(1)
+		  FROM TB_STD_INFO
+		 <!-- WHERE ACA_ID = #{aca_id} -->
+		   WHERE ATD_CHK_CD = #{atd_chk_cd}
+	</select>
+
+	<select id="getStudentDtlRetrieve" parameterType="string" resultType="hashMap">
+		/* StudentMngMapper.getStudentDtlRetrieve */
+			SELECT TSI.STD_ID AS std_id
+			     , TSI.ACA_ID AS aca_id
+			     , TA.ACA_NM as aca_nm
+			     , TAO.LIVE_CLASS_OPER_YN AS live_class_oper_yn
+			     , TSI.STD_NM AS std_nm
+			     , TSI.NICK_NM AS nick_nm
+			     , TSI.STD_MBR_TP AS std_mbr_tp
+			     , TSI.SCH_LVL AS sch_lvl
+			     , TSI.LVL AS std_lvl_cd
+			     , TSI.SCH_GRADE as sch_grade
+			     , TSI.SCH_CD AS sch_grade_cd
+			     , TSI.SCH_NM AS sch_nm
+			     , TSM.SCH_EDU_MGT_CD AS sch_mgt_cd
+			     , TSI.SCH_YEAR AS sch_year
+			     , TSI.CLS AS cls
+   			     , TSI.STD_GB_TXT AS std_gb_txt
+			     , REPLACE(REPLACE(REPLACE(TSI.MEMO, <![CDATA['<p>']]>, ''), <![CDATA['</p>']]>, ''), <![CDATA['<br>']]>, '') AS memo
+			     , TSI.SEX AS sex
+			     , TSI.BIRTH AS birth
+			     , TSI.STD_URL AS std_url
+			     , TSI.STD_STATUS AS std_status
+			     , TSI.ATD_SEND_YN AS atd_send_yn
+			     , TSI.LEV_SEND_YN AS lev_send_yn
+			     , TSI.EXAM_SEND_YN AS exam_send_yn
+			     , TSI.MIG_OLD_ID AS mig_old_id
+			     , TSI.MGT_CLS AS mgt_cls
+			     , TSI.MGT_NUM AS mgt_num
+			     , DATE_FORMAT(TSI.ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS ent_dttm
+			     , TSI.ENT_USER_ID AS ent_user_id
+			     , DATE_FORMAT(TSI.UPT_DTTM, '%Y-%m-%d %H:%i:%s') AS upt_dttm
+			     , TSI.UPT_USER_ID AS upt_user_id
+			     , TU.HP_NO AS hp_no
+			     , TU.TEL_NO AS tel_no
+			     , TU.EMAIL AS email
+			     , TU.SMS_RECV_YN AS sms_recv_yn
+			     , TU.APP_PUSH_RCV_YN AS app_push_rcv_yn
+			     , TU.MSG_RCV_CONF_DTTM AS msg_rcv_conf_dttm
+			     , TU.ZIP_CODE AS zip_code
+			     , TU.ADDR AS addr
+			     , TU.ADDR_DTL AS addr_dtl			     
+			     , REPLACE((SELECT TU.HP_NO FROM TB_USER TU WHERE TU.USER_ID = TP.PARENT_ID), '-', '') AS rep_parent_hp_no
+			     , (SELECT TU.USER_NM FROM TB_USER TU WHERE TU.USER_ID = TP.PARENT_ID) AS rep_parent_nm
+			     , TP.PARENT_ID AS rep_parent_id
+			     , FC_GET_CODE_NM('PARENT_GB_CD', TP.PARENT_GB_CD) AS rep_parent_gb
+			     , TSI.ATD_CHK_CD AS atd_chk_cd
+			     , TSI.CASH_REG_NO AS cash_reg_no
+			     , TSI.CASH_REG_NO_CORP AS cash_reg_no_corp
+			     , TSC.CLASS_CD AS mng_class_cd
+			     , TSI.DC_YN as dc_yn
+			     , TSI.DC_CD AS dc_cd
+			     , TSI.DC_TP AS dc_tp
+			     , TSI.DC_AMT AS dc_amt
+			     , TSI.STUDY_LIVE_CHK AS study_live_chk
+			     , TSI.STUDY_CARE_CHK AS study_care_chk
+			     , TSI.AUTO_INV_YN AS auto_inv_yn
+			     , FN_GET_STD_LESSON_TM(TSI.STD_ID) AS std_cls_nm
+			     , FC_GET_CODE_NM('STD_STATUS', TSI.STD_STATUS) AS std_status_nm
+			     , DATE_FORMAT(TSL2.END_DT, '%Y-%m-%d') AS end_dt
+			     , FN_GET_STD_LESSON_TM(TSI.STD_ID) AS std_cls_nm
+			     , CASE WHEN TSI.STD_STATUS = '02' THEN (SELECT MAX(RETURN_DT) FROM TB_STD_INFO_CHG_LOG WHERE STD_ID = TSI.STD_ID AND STD_STATUS = TSI.STD_STATUS) ELSE '' END AS return_dt
+			     , NVL(TSI.std_mng_file, 'X') as std_mng_file
+			     , FN_GET_BIRTH_AGE(TSI.BIRTH, '') AS std_age
+                 , FN_STD_REMAIN_CLASS_CNT(TSI.STD_ID) AS remain_cnt
+                 , TSI.RESV_SEAT_YN AS resv_seat_yn
+			     , TSI.RESV_SEAT_ROOM_NO AS resv_seat_room_no
+			     , TSI.RESV_SEAT_NO AS seat_no
+		      FROM TB_STD_INFO TSI
+		      LEFT JOIN TB_USER TU ON TU.USER_ID = TSI.STD_ID
+		      LEFT JOIN TB_ACA TA ON TA.ACA_ID = TSI.ACA_ID
+		      LEFT JOIN TB_ACA_OPTION TAO ON TAO.ACA_ID = TSI.ACA_ID		      
+		      LEFT JOIN	TB_SCHOOL_MST TSM ON TSM.SCH_CD = TSI.SCH_CD
+		      LEFT OUTER JOIN (SELECT STD_ID
+		      						, PARENT_ID
+		      						, PARENT_GB_CD
+		      					 FROM TB_PARENTS
+		      					WHERE STD_ID = #{std_id}
+		      					  AND REP_PARENT_YN = 'Y' LIMIT 1) TP
+		      		ON TP.STD_ID = TSI.STD_ID
+       		  LEFT OUTER JOIN (SELECT STD_ID
+		   						 , MIN(STR_DT) AS STR_DT
+		   						 , MAX(END_DT) AS END_DT
+			                  FROM TB_STD_LERN_DTL
+			                 GROUP BY STD_ID
+            				) TSL2 ON TSI.STD_ID = TSL2.STD_ID
+		      LEFT JOIN TB_STD_CLASS TSC ON TSC.STD_ID = TSI.STD_ID
+			 WHERE TSI.STD_ID = #{std_id}
+	</select>
+
+	<select id="getStdCnslListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getStdCnslListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   A.STD_ID AS cnsl_std_id
+		     , A.SEQ AS cnsl_seq
+		     , DATE_FORMAT(A.CNSL_DT, '%Y-%m-%d') AS cnsl_dt
+			 , CASE WHEN TU.ACA_ID = #{aca_id}
+				THEN TU.USER_NM
+				ELSE CONCAT(TU.USER_NM, ' (', TA.ACA_NM ,')')
+				END AS cnsl_user_nm
+		     , A.CNSL_USER_ID AS cnsl_user_id
+		     , A.CNSL_GB_CD AS cnsl_gb_cd
+		     , FC_GET_CODE_NM('CNSL_GB_CD', A.CNSL_GB_CD) AS cnsl_gb_nm
+		     , A.CNSL_TARGET_CD AS cnsl_target_cd
+		     , FC_GET_CODE_NM('CNSL_TARGET_CD', A.CNSL_TARGET_CD) AS cnsl_target_nm
+		     , A.CNSL_CNTS AS cnsl_cnts
+		     , DATE_FORMAT(A.ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS cnsl_ent_dttm
+		     , A.ENT_USER_ID AS cnsl_ent_user_id
+		     , A.ACA_ID AS cnsl_aca_id
+		  FROM TB_STD_CNSL_INFO A
+		  JOIN TB_USER TU ON TU.USER_ID = A.CNSL_USER_ID
+		  JOIN TB_ACA TA ON TA.ACA_ID = TU.ACA_ID
+		 WHERE 1=1
+		   AND A.STD_ID = #{std_id}
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select>
+
+	<insert id="cnslInfoCreate" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* StudentMngMapper.cnslInfoCreate */
+		INSERT
+		  INTO TB_STD_CNSL_INFO ( STD_ID
+					            , SEQ
+					            , ACA_ID
+					       	    , CNSL_DT
+					            , CNSL_CNTS
+					            , CNSL_GB_CD
+					            , CNSL_TARGET_CD
+					            , CNSL_USER_ID
+					            , ENT_DTTM
+					            , ENT_USER_ID
+					            , UPT_DTTM
+					            , UPT_USER_ID
+			  			        )
+			  		      SELECT #{cnsl_std_id}
+			  			   	   , (SELECT IFNULL(MAX(A.SEQ), 0) + 1 FROM TB_STD_CNSL_INFO A WHERE A.STD_ID = #{cnsl_std_id})
+					       	   , (SELECT B.ACA_ID FROM TB_USER B WHERE B.USER_ID = #{cnsl_std_id})
+						       , #{cnsl_dt}
+						       , #{cnsl_cnts}
+						       , #{cnsl_gb_cd}
+						       , #{cnsl_target_cd}
+						       <choose>
+						       		<when test='cnsl_user_id != null and cnsl_user_id != ""'>
+						       			, #{cnsl_user_id}
+						       		</when>
+						       		<otherwise>
+						       			, #{ent_user_id}
+						       		</otherwise>
+						       </choose>
+						       , NOW()
+						       , #{ent_user_id}
+						       , NOW()
+				        	   , #{upt_user_id}
+				           FROM DUAL
+	</insert>
+
+	<update id="cnslInfoUpdate" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* StudentMngMapper.cnslInfoUpdate */
+		UPDATE TB_STD_CNSL_INFO
+		   SET CNSL_DT = #{cnsl_dt}
+		     , CNSL_GB_CD = #{cnsl_gb_cd}
+		     , CNSL_TARGET_CD = #{cnsl_target_cd}
+		     , CNSL_CNTS = #{cnsl_cnts}
+		     <choose>
+		       		<when test='cnsl_user_id != null and cnsl_user_id != ""'>
+		       			, CNSL_USER_ID = #{cnsl_user_id}
+		       		</when>
+		       		<otherwise>
+		       			, CNSL_USER_ID = #{upt_user_id}
+		       		</otherwise>
+		     </choose>
+		     , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		WHERE STD_ID = #{cnsl_std_id}
+		  AND SEQ = #{cnsl_seq}
+	</update>
+
+	<select id="getStdInvoiceListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentInfoMngMapper.getStdInvoiceListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   SUBSTR(DATE_FORMAT(IFNULL(A.LEARN_FDT, A.ISSUE_DT), '%Y-%m-%d'),1,7) AS invoice_month
+		     , DATE_FORMAT(A.ISSUE_DT, '%Y-%m-%d') AS invoice_issue_dt
+		     , CASE WHEN  IFNULL(A.TOT_AMT, (A.AMT + A.VAT)) > 0 THEN IFNULL(A.TOT_AMT, (A.AMT + A.VAT)) ELSE 0 END AS invoice_tot_amt
+		     , CASE WHEN A.PAY_YN = 'Y' THEN '결제완료'
+		     		WHEN A.PAY_YN = 'P' THEN '부분결제완료'
+		     		WHEN A.PAY_YN = 'N' THEN '미결제'
+		     		WHEN A.PAY_YN = 'D' THEN '취소'
+		     		END AS invoice_pay_yn_nm
+		     , A.PAY_YN AS invoice_pay_yn
+		     , A.INVOICE_NM AS invoice_nm
+		     , IFNULL(DATE_FORMAT(A.LEARN_FDT, '%Y-%m-%d'), '') AS invoice_learn_fdt
+		     , IFNULL(DATE_FORMAT(A.LEARN_TDT, '%Y-%m-%d'), '') AS invoice_learn_tdt
+		     , CONCAT(IFNULL(DATE_FORMAT(A.LEARN_FDT, '%Y-%m-%d'), ''), ' ~ ', IFNULL(DATE_FORMAT(A.LEARN_TDT, '%Y-%m-%d'), '')) AS invoice_learn_period
+		     , DATE_FORMAT(A.RECV_LIMIT_DT, '%Y-%m-%d') AS invoice_recv_limit_dt
+		     , A.TAX_TP AS invoice_tax_tp
+		     , A.NOTI_YN AS invoice_noti_yn
+		     , A.RECV_CHK_YN AS invoice_recv_chk_yn
+		     , A.MEMO_PARENTS AS memo_parents
+		     , A.MEMO_ACA AS memo_aca
+		     , A.ENT_USER_ID AS ent_user_id
+		     , DATE_FORMAT(A.ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS ent_dttm
+		     , A.INVOICE_NO AS invoice_no
+		     , A.INVOICE_ENC AS invoice_enc
+		     , IFNULL(DATE_FORMAT(A.PAY_DT, '%Y-%m-%d'), '') AS invoice_pay_dt
+		     , IFNULL((SELECT CNT FROM TB_INVOICE_DTL WHERE INVOICE_NO = A.INVOICE_NO AND CORP_CD = A.ACA_ID AND GOODS_CD = '100001'), 0) AS cnt
+		     , TP.PAY_NO as invoice_pay_no
+		     , TP.PAY_GB as invoice_pay_gb
+		     , TP.sales_tp as invoice_sales_tp
+		     , CASE WHEN TSP.PAY_TYPE_CNT > 1 THEN '복합' ELSE FC_GET_CODE_NM('PAY_TYPE', TSP.PAY_TYPE) END AS invoice_pay_method 
+		     , A.CLASS_CD AS invoice_class_cd
+		     , TC.CLASS_NM AS invoice_class_nm
+             , TC.ACA_ID AS invoice_aca_id
+		     , A.CLASS_PRICE AS class_tot_amt
+		     , A.CLASS_AMT AS amt
+		     , A.AMT AS tot_amt
+		     , A.DC_CD AS invoice_dc_cd
+		     , A.DC_TP AS invoice_dc_tp
+		     , A.DC_AMT AS invoice_dc_amt
+		     , TA.TEL_NO AS aca_tel_no
+		     , DATE_FORMAT(TC.CLASS_SDT,'%Y-%m-%d') as hidden_class_sdt
+		     , IFNULL(TC.CLASS_EDT,'') as hidden_class_edt
+		     , IFNULL(SUBSTRING_INDEX(TC.CLASS_PERIOD_TP, ' ',1),'') as hidden_class_period_tp
+		     , TC.CLASS_OPR_TP AS class_opr_tp
+		     , A.CLASS_CNT AS class_cnt
+		     , (SELECT SALES_TP FROM TB_SALES_MST WHERE INVOICE_NO = A.INVOICE_NO GROUP BY INVOICE_NO) AS sales_tp
+		     , A.CLASS_CORP_CD			  as class_corp_cd
+             , GROUP_CONCAT(DISTINCT TID.goods_cd) as goods_cd
+             , GROUP_CONCAT(TID.corp_cd)  as corp_cd
+             , GROUP_CONCAT(TID.price) 	  as price
+             , GROUP_CONCAT(TID.cnt)	  as goods_cnt
+             , GROUP_CONCAT(TID.dc_tp)	  as dc_tp
+             , GROUP_CONCAT(TID.dc_cd)	  as dc_cd
+             , GROUP_CONCAT(TID.dc_amt)	  as dc_amt
+             , TC.CLASS_STANDING_YN 	  as class_standing_yn
+			 , FN_GET_CLASS_TIME_CNT(TC.CLASS_CD, A.LEARN_FDT, A.LEARN_TDT) AS prtm_cnt
+             , TC.CLASS_AMT * FN_GET_CLASS_TIME_CNT(TC.CLASS_CD, A.LEARN_FDT, A.LEARN_TDT) AS prtm_amt
+			 , A.BASE_INV_CHK AS base_inv_chk
+		  FROM TB_INVOICE A
+		  LEFT OUTER JOIN TB_PAYMENT TP ON TP.INVOICE_NO = A.INVOICE_NO AND TP.PAY_GB = 'A'
+		  LEFT OUTER JOIN TB_CLASS TC ON TC.CLASS_CD = A.CLASS_CD
+		  LEFT JOIN TB_ACA TA ON TA.ACA_ID = A.ACA_ID
+		  LEFT JOIN (
+						SELECT
+							  INVOICE_NO AS invoice_no
+							, CORP_CD	AS corp_cd
+							, GOODS_CD  AS goods_cd
+							, PRICE 	AS price
+							, CNT		AS cnt
+							, IFNULL(DC_TP,'') AS dc_tp
+							, IFNULL(DC_CD,'') AS dc_cd
+							, DC_AMT As dc_amt
+						FROM
+							TB_INVOICE_DTL
+						WHERE
+							INVOICE_GB_CD = '2'
+						ORDER BY CORP_CD
+					) TID ON TID.invoice_no = A.INVOICE_NO
+			LEFT OUTER JOIN (
+				SELECT MAP.INVOICE_NO 
+				, MIN(SM.PAY_TYPE) AS PAY_TYPE
+				, COUNT(DISTINCT SM.PAY_TYPE) AS PAY_TYPE_CNT
+				FROM TB_INVOICE_CORP_PAY_MAP MAP 
+				JOIN TB_SALES_MST SM ON MAP.SALES_NO = SM.SALES_NO
+				GROUP BY MAP.INVOICE_NO
+			) TSP ON TSP.INVOICE_NO = A.INVOICE_NO		
+		 WHERE 1=1
+		   AND A.STD_ID = #{std_id}
+		   AND A.INVOICE_TP IN ('EDU', 'REP') 
+		   AND A.USE_YN != 'D'
+		   AND A.INVOICE_GB = '01'
+		    GROUP BY A.INVOICE_NO
+	   <choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.ENT_DTTM DESC, A.ISSUE_DT DESC, A.LEARN_FDT DESC, A.INVOICE_NM ASC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select>
+
+	<select id="getStdInvoiceDtlListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getStdInvoiceDtlListRetrieve */
+			SELECT A.INVOICE_NO AS invoice_dtl_no
+	            , A.CORP_CD AS invoice_corp_cd
+	            , A.GOODS_CD AS invoice_goods_cd
+	            , A.PRICE AS invoice_aca_price
+		        , A.DC_CD AS invoice_dc_cd
+		        , A.DC_TP AS invoice_dc_tp
+		        , CASE WHEN A.DC_TP = "02" THEN (A.DC_AMT + B.DC_AMT)
+                       ELSE A.DC_AMT
+                       END AS invoice_dc_amt
+	            , A.AMT AS center_amt
+	            , A.VAT AS center_vat
+	            , (IFNULL(A.AMT,0) + IFNULL(A.VAT,0)) AS center_tot_amt
+	            , A.CNT AS invoice_cnt
+	            , B.AMT AS p_aca_amt
+	            , B.VAT AS p_aca_vat
+	            , (IFNULL(B.AMT,0) + IFNULL(B.VAT,0)) AS p_aca_tot_amt
+	            , CASE WHEN D.CORP_TP = '00' THEN 'N'
+	              		 ELSE 'Y'
+	              		 END AS invoice_dc_tp_yn
+	            , C.SET_ITEM_CHK AS invoice_set_item
+	            , C.TOT_AMT AS goods_amt
+	            , C.GOODS_PAY_DIV_CHK AS goods_pay_div_chk
+	            , C.GOODS_PAY_CALC_TP AS goods_pay_calc_tp
+	            , C.GOODS_PAY_CALC_VAL AS goods_pay_calc_val
+	            , (IFNULL(A.AMT,0) + IFNULL(A.VAT,0) + IFNULL(B.AMT,0) + IFNULL(B.VAT,0)) AS invoice_amt
+	            , B.CORP_CD AS p_aca_corp_cd
+	            , B.GOODS_CD AS p_aca_goods_cd
+	            , B.PRICE AS p_aca_price
+	            , (SELECT GOODS_TP FROM TB_CORP_GOODS WHERE CORP_CD = B.CORP_CD AND GOODS_CD = B.GOODS_CD) AS p_aca_goods_tp
+	            , (IFNULL(A.PRICE,0) + IFNULL(B.PRICE,0)) AS invoice_tot_price
+	            , B.DC_AMT AS p_aca_dc_amt
+	            , A.DC_AMT AS aca_dc_amt
+	         FROM TB_INVOICE_DTL A
+	         JOIN TB_INVOICE_DTL B
+	           ON A.INVOICE_NO = B.INVOICE_NO
+	           AND A.CORP_CD != 'AC00001'
+	           AND A.GOODS_CD = B.GOODS_CD
+	         LEFT OUTER JOIN TB_CORP_GOODS C
+	        	ON A.CORP_CD = C.CORP_CD
+	        	AND A.GOODS_CD = C.GOODS_CD
+	         LEFT OUTER JOIN TB_SALES_CORP D
+	            ON C.CORP_CD = D.CORP_CD
+	        WHERE A.INVOICE_NO = #{invoice_no}
+	          AND C.GOODS_PAY_DIV_CHK = "Y"
+	          AND A.CORP_CD != B.CORP_CD
+	          AND C.GOODS_PAY_CALC_VAL != 0
+      UNION ALL
+	        SELECT A.INVOICE_NO AS invoice_dtl_no
+	            , A.CORP_CD AS invoice_corp_cd
+	            , A.GOODS_CD AS invoice_goods_cd
+	            , A.PRICE AS invoice_aca_price
+		        , A.DC_CD AS invoice_dc_cd
+		        , A.DC_TP AS invoice_dc_tp
+		        , A.DC_AMT AS invoice_dc_amt
+	            , A.AMT AS center_amt
+	            , A.VAT AS center_vat
+	            , (IFNULL(A.AMT,0) + IFNULL(A.VAT,0)) AS center_tot_amt
+	            , A.CNT AS invoice_cnt
+	            , 0 AS p_aca_amt
+	            , 0 AS p_aca_vat
+	            , 0 AS p_aca_tot_amt
+	            , CASE WHEN D.CORP_TP = '00' THEN 'N'
+	              		 ELSE 'Y'
+	              		 END AS invoice_dc_tp_yn
+	            , C.SET_ITEM_CHK AS invoice_set_item
+	            , C.TOT_AMT AS goods_amt
+	            , C.GOODS_PAY_DIV_CHK AS goods_pay_div_chk
+	            , C.GOODS_PAY_CALC_TP AS goods_pay_calc_tp
+	            , C.GOODS_PAY_CALC_VAL AS goods_pay_calc_val
+	            , (IFNULL(A.AMT,0) + IFNULL(A.VAT,0)) AS invoice_amt
+	            , "" AS p_aca_corp_cd
+	            , "" AS p_aca_goods_cd
+	            , "" AS p_aca_price
+	            , "" AS p_aca_goods_tp
+	            , IFNULL(A.PRICE, 0) AS invoice_tot_price
+	            , "" AS p_aca_dc_amt
+	            , A.DC_AMT AS aca_dc_amt
+	         FROM TB_INVOICE_DTL A
+	         LEFT OUTER JOIN TB_CORP_GOODS C
+	        	ON A.CORP_CD = C.CORP_CD
+	        	AND A.GOODS_CD = C.GOODS_CD
+	         LEFT OUTER JOIN TB_SALES_CORP D
+	            ON C.CORP_CD = D.CORP_CD
+	        WHERE A.INVOICE_NO = #{invoice_no}
+              AND C.GOODS_PAY_DIV_CHK = "N"
+        UNION ALL
+	        SELECT A.INVOICE_NO AS invoice_dtl_no
+	            , A.CORP_CD AS invoice_corp_cd
+	            , A.GOODS_CD AS invoice_goods_cd
+	            , A.PRICE AS invoice_aca_price
+		        , A.DC_CD AS invoice_dc_cd
+		        , A.DC_TP AS invoice_dc_tp
+		        , A.DC_AMT AS invoice_dc_amt
+	            , A.AMT AS center_amt
+	            , A.VAT AS center_vat
+	            , (IFNULL(A.AMT,0) + IFNULL(A.VAT,0)) AS center_tot_amt
+	            , A.CNT AS invoice_cnt
+	            , 0 AS p_aca_amt
+	            , 0 AS p_aca_vat
+	            , 0 AS p_aca_tot_amt
+	            , CASE WHEN D.CORP_TP = '00' THEN 'N'
+	              		 ELSE 'Y'
+	              		 END AS invoice_dc_tp_yn
+	            , C.SET_ITEM_CHK AS invoice_set_item
+	            , C.TOT_AMT AS goods_amt
+	            , C.GOODS_PAY_DIV_CHK AS goods_pay_div_chk
+	            , C.GOODS_PAY_CALC_TP AS goods_pay_calc_tp
+	            , C.GOODS_PAY_CALC_VAL AS goods_pay_calc_val
+	            , (IFNULL(A.AMT,0) + IFNULL(A.VAT,0)) AS invoice_amt
+	            , 'AC00001' AS p_aca_corp_cd
+	            , A.GOODS_CD AS p_aca_goods_cd
+	            , 0 AS p_aca_price
+	            , (SELECT GOODS_TP FROM TB_CORP_GOODS WHERE CORP_CD = 'AC00001' AND GOODS_CD = A.GOODS_CD) AS p_aca_goods_tp
+	            , IFNULL(A.PRICE, 0) AS invoice_tot_price
+	            , 0 AS p_aca_dc_amt
+	            , A.DC_AMT AS aca_dc_amt
+	         FROM TB_INVOICE_DTL A
+	         LEFT OUTER JOIN TB_CORP_GOODS C
+	        	ON A.CORP_CD = C.CORP_CD
+	        	AND A.GOODS_CD = C.GOODS_CD
+	         LEFT OUTER JOIN TB_SALES_CORP D
+	            ON C.CORP_CD = D.CORP_CD
+	        WHERE A.INVOICE_NO = #{invoice_no}
+              AND C.GOODS_PAY_DIV_CHK = "Y"
+              AND C.GOODS_PAY_CALC_VAL = 0
+			  AND A.CORP_CD != 'AC00001'
+	</select>
+
+	<select id="getStdParentsListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getStdParentsListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   FC_GET_CODE_NM('PARENT_GB_CD', A.PARENT_GB_CD) AS parents_gb_nm
+		     , B.USER_NM AS parents_user_nm
+		     , A.PARENT_ID AS parents_user_id
+		     , B.TEL_NO AS parents_tel_no
+		     , B.HP_NO AS parents_hp_no
+		     , CONCAT(B.ADDR, ' ', B.ADDR_DTL) AS parents_addr
+		     , IFNULL(A.REP_PARENT_YN, 'N') AS rep_parent_yn
+		     , IFNULL(C.AUTH_DTTM, 'N') AS parents_auth_yn
+		     , IFNULL(DATE_FORMAT(C.AUTH_DTTM, '%Y-%m-%d'),'') AS parents_auth_dttm
+		     , DATE_FORMAT(A.ENT_DTTM, '%Y-%m-%d') AS parents_ent_dttm
+		  FROM TB_PARENTS A
+		  LEFT OUTER JOIN TB_USER B
+		    ON A.PARENT_ID = B.USER_ID
+		  LEFT OUTER JOIN (SELECT USER_ID
+		  						, MAX(AUTH_DTTM) AS AUTH_DTTM
+		  					 FROM TB_USER_AUTH_INFO
+		  					GROUP BY USER_ID) C
+		  	ON A.PARENT_ID = C.USER_ID
+		 WHERE 1=1
+		   AND A.STD_ID = #{std_id}
+		   AND B.USE_YN = 'Y'
+	   <choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select>
+
+	<select id="getInvNo" resultType="string">
+	/* StudentMngMapper.getInvNo */
+		SELECT FN_GET_JOB_SEQ('TB_INVOICE') AS invoice_no
+		  FROM DUAL
+	</select>
+
+	<insert id="invoiceInfoCreate" parameterType="hashMap">
+	/* StudentMngMapper.invoiceInfoCreate */
+		INSERT
+		  INTO TB_INVOICE ( INVOICE_NO
+		  				  , INVOICE_TP
+				          , ACA_ID
+				          , STD_ID
+				          , INVOICE_NM
+				          , LEARN_FDT
+				          , LEARN_TDT
+				          , ISSUE_DT
+				          , RECV_LIMIT_DT
+				          , TAX_TP
+				          , AMT
+				          , VAT
+				          , TOT_AMT
+				          , MEMO_ACA
+				          , MEMO_PARENTS
+				          , NOTI_YN
+				          , RECV_CHK_YN
+				          , PAY_YN
+				          , ENT_DTTM
+			              , ENT_USER_ID
+			              , UPT_DTTM
+			              , UPT_USER_ID
+			              , INVOICE_ENC
+			  			  )
+		  		   SELECT #{invoice_no}
+		  		   		, 'EDU'
+				       	, #{aca_id}
+		  		    	, #{std_id}
+				       	, #{invoice_nm}
+				       	, #{learn_fdt}
+		  		    	, #{learn_tdt}
+				       	, #{issue_dt}
+				       	, #{recv_limit_dt}
+		  		    	, #{tax_tp}
+				       	, (SELECT SUM(AMT) FROM TB_INVOICE_DTL WHERE INVOICE_NO = #{invoice_no})
+				       	, (SELECT SUM(VAT) FROM TB_INVOICE_DTL WHERE INVOICE_NO = #{invoice_no})
+		  		    	, #{amt}
+				       	, #{memo_aca}
+				       	, #{memo_parents}
+		  		    	, #{noti_yn}
+				       	, #{recv_chk_yn}
+				       	, 'N'
+					    , NOW()
+					    , #{ent_user_id}
+					    , NOW()
+			        	, #{upt_user_id}
+			        	, #{invoice_enc}
+			        FROM DUAL
+	</insert>
+
+	<insert id="invoiceDtlInfoCreate" parameterType="hashMap">
+	/* StudentMngMapper.invoiceDtlInfoCreate */
+		INSERT
+		  INTO TB_INVOICE_DTL ( INVOICE_NO
+					          , CORP_CD
+					          , GOODS_CD
+					          , PRICE
+					          , CNT
+					          , DC_TP
+					          , DC_CD
+					          , DC_AMT
+					          , AMT
+					          , VAT
+					          , ENT_DTTM
+				              , ENT_USER_ID
+				              , UPT_DTTM
+				              , UPT_USER_ID
+				  			  )
+			  		   SELECT #{invoice_no}
+					       	, #{corp_cd}
+			  		    	, #{goods_cd}
+					       	, #{price}
+					       	, #{cnt}
+					       	, #{dc_tp}
+			  		    	, #{dc_cd}
+					       	, #{dc_amt}
+					       	, CASE WHEN (SELECT TAX_TP
+					       				   FROM TB_CORP_GOODS
+					       				  WHERE CORP_CD = #{corp_cd}
+					       				    AND GOODS_CD = #{goods_cd}
+					       				    AND USE_YN = 'Y') = '01' THEN ROUND((#{dtl_amt}/1.1), 0)
+					       		   ELSE #{dtl_amt}
+					       		   END
+			  		    	, CASE WHEN (SELECT TAX_TP
+					       				   FROM TB_CORP_GOODS
+					       				  WHERE CORP_CD = #{corp_cd}
+					       				    AND GOODS_CD = #{goods_cd}
+					       				    AND USE_YN = 'Y') = '01' THEN #{dtl_amt} - ROUND((#{dtl_amt}/1.1), 0)
+					       		   ELSE '0'
+					       		   END
+						    , NOW()
+						    , #{ent_user_id}
+						    , NOW()
+				        	, #{upt_user_id}
+				        FROM DUAL
+	</insert>
+
+	<select id="getParentId" parameterType="hashMap" resultType="String">
+	/* StudentMngMapper.getParentId */
+		 SELECT PARENT_ID
+	       FROM ( SELECT T.*
+	                   , (CASE @STD WHEN T.STD_ID THEN @rownum := @rownum+1 ELSE @rownum := 1 END) AS RNUM
+	                   , (@STD:=T.STD_ID) vjob
+	                FROM ( SELECT STD_ID
+	                            , PARENT_ID
+	                            , CASE WHEN REP_PARENT_YN = 'Y' THEN 1
+	                                   ELSE 2
+	                                   END AS ORD
+	                         FROM TB_PARENTS
+	                        WHERE STD_ID = #{std_id}
+	                       ) T
+	             		 , (SELECT @STD := '', @rownum:=0 FROM DUAL ) TD
+	       		  ORDER BY T.STD_ID, T.ORD
+	              ) T1
+	     WHERE RNUM = 1
+	</select>
+
+	<select id="getNotiSeq" resultType="string">
+	/* StudentMngMapper.getNotiSeq */
+		SELECT FN_GET_JOB_SEQ('TB_NOTI') AS noti_seq
+		  FROM DUAL
+	</select>
+
+	<insert id="notiInfoCreate" parameterType="hashMap">
+	/* StudentMngMapper.notiInfoCreate */
+		INSERT
+		  INTO TB_NOTI ( NOTI_SEQ
+		  			   , ACA_ID
+				       , NOTI_TP
+				       , SEND_TP
+				       , TITLE
+				       , CNTS
+				       , USE_YN
+				       , ENT_DTTM
+				       , ENT_USER_ID
+				       , UPT_DTTM
+				       , UPT_USER_ID
+			  		   )
+		  		   SELECT #{noti_seq}
+		  		   	 	, #{aca_id}
+				       	, '02'
+				       	, '02'
+		  		    	, #{invoice_nm}
+				       	, #{cnts}
+				       	, 'Y'
+					    , NOW()
+					    , #{ent_user_id}
+					    , NOW()
+			        	, #{upt_user_id}
+			        FROM DUAL
+	</insert>
+
+	<insert id="notiReadCreate" parameterType="hashMap">
+	/* StudentMngMapper.notiReadCreate */
+		INSERT
+		  INTO TB_NOTI_READ ( NOTI_SEQ
+					        , USER_ID
+					        , SEND_DTTM
+				  		    )
+		  		       SELECT #{noti_seq}
+		  		    	    , #{parent_id}
+				       	    , NOW()
+			            FROM DUAL
+	</insert>
+
+	<insert id="smsInfoCreate" parameterType="hashMap">
+	/* StudentMngMapper.smsInfoCreate */
+		INSERT
+		  INTO TB_SMS (MT_TYPE
+		  			<if test="reserved_date != null and !reserved_date.equals('')">
+		             , RESERVED_DATE
+		             </if>
+		             , PHONE_NUMBER
+		             , CALLBACK
+		             , TITLE
+		             , MESSAGE
+		             , RETUNR_SEQ
+		             , REQUEST_DATE
+		             , RESPONSE_DATE
+		             , RESPONSE_CODE
+		             , REPORT_TYPE
+		             , REPORT_DATE
+		             , REPORT_CODE
+		             , ARRIVAL_DATE
+		             , ACA_ID
+		             , STD_ID
+		             , ENT_USER_ID
+		             , SMS_CONT_TP
+		             , STATUS)
+			    SELECT #{mt_type}
+						<if test="reserved_date != null and !reserved_date.equals('')">
+							, CONCAT(#{reserved_date}, ' 10:00:00')
+						</if>
+			 	     , (SELECT TU.HP_NO FROM TB_USER TU WHERE TU.USER_ID = #{parent_id})
+			 	     , (SELECT TA.TEL_NO FROM TB_ACA TA WHERE TA.ACA_ID = #{aca_id})
+			 	     , #{invoice_nm}
+			 	     , #{cnts}
+				     , #{retunr_seq}
+				     , DATE_FORMAT(NOW(), '%Y-%m-%d')
+				     , #{response_date}
+				     , #{response_code}
+				     , #{report_type}
+				     , #{report_date}
+				     , #{report_code}
+				     , #{arrival_date}
+				     , #{aca_id}
+				     , #{std_id}
+				     , #{ent_user_id}
+				     , #{sms_cont_tp}
+				     , '0'
+			      FROM DUAL
+	</insert>
+
+	<update id="invoiceInfoUpdate" parameterType="hashMap">
+	/* StudentMngMapper.invoiceInfoUpdate */
+		UPDATE TB_INVOICE
+		   SET LEARN_FDT = #{learn_fdt}
+		     , LEARN_TDT = #{learn_tdt}
+		     , ISSUE_DT = #{issue_dt}
+		     , RECV_LIMIT_DT = #{recv_limit_dt}
+		     , TAX_TP = #{tax_tp}
+		     , AMT = (SELECT SUM(AMT) FROM TB_INVOICE_DTL WHERE INVOICE_NO = #{invoice_no})
+		     , VAT = (SELECT SUM(VAT) FROM TB_INVOICE_DTL WHERE INVOICE_NO = #{invoice_no})
+		     , TOT_AMT = #{amt}
+		     , MEMO_ACA = #{memo_aca}
+		     , MEMO_PARENTS = #{memo_parents}
+		     , NOTI_YN = #{noti_yn}
+		     , RECV_CHK_YN = #{recv_chk_yn}
+		     , INVOICE_NM = #{invoice_nm}
+		     , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		WHERE INVOICE_NO = #{invoice_no}
+	</update>
+
+	<delete id="invoiceDtlDelete" parameterType="hashMap">
+	/* StudentMngMapper.invoiceDtlDelete */
+		DELETE FROM TB_INVOICE_DTL
+	     WHERE 1=1
+		   AND INVOICE_NO = #{invoice_no}
+	</delete>
+
+	<update id="invoicePayYnUpdate" parameterType="hashMap">
+	/* StudentMngMapper.invoicePayYnUpdate */
+		UPDATE TB_INVOICE
+		   SET PAY_YN = #{payYn}
+		   	 , USE_YN = 'D'
+		     , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		WHERE INVOICE_NO = #{invoice_no}
+	</update>
+
+	<select id="getStdParentsSrchListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getStdParentsSrchListRetrieve */
+		SELECT A.USER_NM AS parents_find_nm
+		     , A.USER_ID AS parents_find_user_id
+		     , A.TEL_NO AS parents_find_tel_no
+		     , A.HP_NO AS parents_find_hp_no
+		  FROM TB_USER A
+		 WHERE 1=1
+		   AND A.USER_GB_CD = '03'
+ 	       AND A.ACA_ID = (SELECT B.ACA_ID
+	      				     FROM TB_STD_INFO B
+		    				WHERE B.STD_ID = #{std_id})
+		   AND A.USER_ID NOT IN (SELECT C.PARENT_ID
+		    					   FROM TB_PARENTS C
+		    					  WHERE C.STD_ID = #{std_id})
+		   AND A.USE_YN = 'Y'
+		 <if test="srch_tp != ''">
+		 	<if test="srch_tp == 'name_tp'">
+		 		AND A.USER_NM LIKE CONCAT('%',#{srch_parents_inp},'%')
+		 	</if>
+		 	<if test="srch_tp == 'tel_tp'">
+		 		AND REPLACE(A.TEL_NO, '-', '') LIKE CONCAT('%', REPLACE(#{srch_parents_inp}, '-', '') ,'%')
+		 	</if>
+		 	<if test="srch_tp == 'hp_tp'">
+		 		AND REPLACE(A.HP_NO, '-', '') LIKE CONCAT('%', REPLACE(#{srch_parents_inp}, '-', ''),'%')
+		 	</if>
+		 </if>
+		 <choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.ENT_DTTM DESC
+       		</otherwise>
+      	 </choose>
+	</select>
+
+	<select id="getStdParentInfoRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getStdParentInfoRetrieve */
+		SELECT A.PARENT_GB_CD AS parent_reg_gb_cd
+		     , B.USER_NM AS parent_reg_user_nm
+		     , IFNULL(A.REP_PARENT_YN, 'N') AS rep_parent_yn
+		     , A.PARENT_ID AS parent_reg_user_id
+		     , B.TEL_NO AS parent_reg_tel_no
+		     , B.HP_NO AS parent_reg_hp_no
+		     , B.EMAIL AS parent_reg_email
+		     , B.ZIP_CODE AS parent_reg_zip_code
+		     , B.ADDR AS parent_reg_addr
+		     , B.ADDR_DTL AS parent_reg_addr_dtl
+		     , A.SMS_CONT AS parent_sms_cont_tp
+		  FROM TB_PARENTS A
+		  LEFT OUTER JOIN TB_USER B
+		    ON A.PARENT_ID = B.USER_ID
+		 WHERE 1=1
+		   AND A.PARENT_ID = #{user_id}
+		   AND A.STD_ID = #{std_id}
+		   AND B.USE_YN = 'Y'
+	</select>
+
+	<select id="getRepParentChk" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getRepParentChk */
+		SELECT COUNT(*) AS rep_parent_cnt
+		  FROM TB_PARENTS
+		 WHERE STD_ID = #{parent_reg_std_id}
+		   AND REP_PARENT_YN = 'Y'
+		 <if test="parent_reg_user_id != ''">
+		   AND PARENT_ID <![CDATA[<>]]> #{parent_reg_user_id}
+		 </if>
+	</select>
+
+	<insert id="parentsCreate" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* StudentMngMapper.parentsCreate */
+		INSERT
+		  INTO TB_PARENTS ( PARENT_ID
+				          , STD_ID
+				          , PARENT_GB_CD
+				          , REP_PARENT_YN
+				          , ENT_DTTM
+			              , ENT_USER_ID
+			              , UPT_DTTM
+			              , UPT_USER_ID
+			  			  )
+		  		   SELECT #{parents_find_user_id}
+		  		    	, #{parents_find_info_std_id}
+				       	, #{parents_find_gb_cd}
+				       	, CASE WHEN (SELECT COUNT(*)
+									  FROM TB_PARENTS
+									 WHERE STD_ID = #{parents_find_info_std_id}
+									   AND REP_PARENT_YN = 'Y') = 0 THEN 'Y'
+							   ELSE 'N'
+							   END AS REP_PARENT_YN
+					    , NOW()
+					    , #{ent_user_id}
+					    , NOW()
+			        	, #{upt_user_id}
+			        FROM DUAL
+	</insert>
+	
+	<select id="stdBroList" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO" resultType="java.util.HashMap">
+	/* StudentInfoMngMapper.stdBroList */
+		SELECT 
+			STD_ID AS bro_std_id		
+		FROM 
+			TB_PARENTS
+		WHERE 
+			PARENT_ID = #{parent_reg_user_id}						
+	</select>
+
+	<select id="getStdParentId" resultType="string">
+		SELECT FN_GET_JOB_SEQ('TB_PARENTS')
+	</select>
+
+	<insert id="parentInfoCreate" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* StudentMngMapper.parentInfoCreate */
+		INSERT
+		  INTO TB_USER ( USER_ID
+				       , ACA_ID
+				       , USER_PWD
+		           	   , USER_NM
+		               , USER_GB_CD
+		               , HP_NO
+		               , TEL_NO
+		               , EMAIL
+		               , ZIP_CODE
+		               , ADDR
+		               , ADDR_DTL
+		               , USE_YN
+		               , ENT_DTTM
+		               , ENT_USER_ID
+		               , UPT_DTTM
+		               , UPT_USER_ID
+			  		   )
+		  		 SELECT 
+		  		 	  <choose>
+		  		 	  	<when test='parent_id != null and parent_id != ""'>
+		  		 	  	REPLACE(#{parent_id}, '-', '')	
+		  		 	  	</when>
+		  		 	  	<otherwise>
+		  		 	  	REPLACE(#{parent_reg_hp_no}, '-', '')
+		  		 	  	</otherwise>
+		  		 	  </choose>		  		 	  
+		  		      , (SELECT B.ACA_ID FROM TB_USER B WHERE B.USER_ID = #{parent_reg_std_id})
+				      , PASSWORD(#{parent_reg_user_pswd})
+				      , #{parent_reg_user_nm}
+				      , '03'
+				      , #{parent_reg_hp_no}
+				      , #{parent_reg_tel_no}
+				      , #{parent_reg_email}
+				      , #{parent_reg_zip_code}
+				      , #{parent_reg_addr}
+				      , #{parent_reg_addr_dtl}
+				      , 'Y'
+					  , NOW()
+					  , #{ent_user_id}
+					  , NOW()
+			          , #{upt_user_id}
+			      FROM DUAL
+	</insert>
+
+	<insert id="parentCreate" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* StudentMngMapper.parentCreate */
+		INSERT
+		  INTO TB_PARENTS ( PARENT_ID
+				          , STD_ID
+				          , PARENT_GB_CD
+				          , REP_PARENT_YN
+				          , SMS_CONT
+				          , ENT_DTTM
+			              , ENT_USER_ID			             
+			  			  )
+		  		   SELECT 
+		  		   		<choose>
+			  		 	  	<when test='parent_id != null and parent_id != ""'>
+			  		 	  	REPLACE(#{parent_id}, '-', '')	
+			  		 	  	</when>
+			  		 	  	<otherwise>
+			  		 	  	REPLACE(#{parent_reg_hp_no}, '-', '')
+			  		 		</otherwise>
+			  		 	</choose>
+		  		    	, #{parent_reg_std_id}
+				       	, #{parent_reg_gb_cd}
+				       	, CASE WHEN (SELECT COUNT(*)
+									  FROM TB_PARENTS
+									 WHERE STD_ID = #{parent_reg_std_id}
+									   AND REP_PARENT_YN = 'Y') = 0 THEN 'Y'
+							   ELSE 'N'
+							   END AS REP_PARENT_YN
+						, #{parent_sms_cont}	   
+					    , NOW()
+					    , #{ent_user_id}					    
+			        FROM DUAL
+		ON DUPLICATE KEY UPDATE
+				UPT_DTTM = NOW()
+			    , UPT_USER_ID = #{upt_user_id}	        
+	</insert>
+
+	<update id="updateRepParentInfo" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* mapper.updateRepParentInfo */
+		UPDATE
+			TB_PARENTS SET
+				REP_PARENT_YN = 'N'
+		WHERE
+			STD_ID = #{parent_reg_std_id}
+	</update>
+
+	<update id="parentInfoUpdate" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* StudentMngMapper.parentInfoUpdate */
+		UPDATE TB_USER
+		   SET 
+		     <if test='parent_reg_user_pswd != null and parent_reg_user_pswd != ""'>
+		     USER_PWD = PASSWORD(#{parent_reg_user_pswd}), 
+		     </if>
+		     USER_NM = #{parent_reg_user_nm}
+		     , HP_NO = #{parent_reg_hp_no}
+		     , TEL_NO = #{parent_reg_tel_no}
+		     , EMAIL = #{parent_reg_email}
+		     , ZIP_CODE = #{parent_reg_zip_code}
+		     , ADDR = #{parent_reg_addr}
+		     , ADDR_DTL = #{parent_reg_addr_dtl}
+		     , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		WHERE USER_ID = #{parent_reg_user_id}
+		  AND USE_YN = 'Y'
+	</update>
+
+	<select id="getRepParentInfo" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getRepParentInfo */
+		SELECT TU.HP_NO AS rep_parent_hp_no
+		     , TU.USER_NM AS rep_parent_nm
+			 , FC_GET_CODE_NM('PARENT_GB_CD', TP.PARENT_GB_CD) AS rep_parent_gb
+			 , TP.PARENT_ID AS rep_parent_id
+		  FROM TB_PARENTS TP
+		  JOIN TB_USER TU
+		  	ON TU.USER_ID = TP.PARENT_ID
+		 WHERE TP.STD_ID = #{std_id}
+		   AND TP.REP_PARENT_YN = 'Y'
+	</select>
+
+	<update id="parentUpdate" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* StudentMngMapper.parentUpdate */
+		UPDATE TB_PARENTS
+		   SET PARENT_GB_CD = #{parent_reg_gb_cd}
+		   	 , REP_PARENT_YN = #{parent_yn}
+		   	 , SMS_CONT = #{parent_sms_cont}
+		     , UPT_DTTM = NOW()
+		     , UPT_USER_ID = #{upt_user_id}
+		WHERE PARENT_ID = #{parent_reg_user_id}
+		  AND STD_ID = #{parent_reg_std_id}
+	</update>
+
+	<select id="getStdLectureList" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getStdLectureList */
+		SELECT	SQL_CALC_FOUND_ROWS
+				  CAL.STD_ID AS std_id
+				, CAL.CLASS_CD AS class_cd
+				, DATE_FORMAT(CAL.APPLY_DT, '%Y-%m') AS apply_dt
+				, CLS.SUBJECT_CD AS subject_cd
+		        , FC_GET_CLASS_SUBJECT_NM(CAL.CLASS_CD) AS subject_nm
+		 		, CLS.CLASS_NM AS class_nm
+		        , CLS.ACA_ID		as cls_aca_id
+		        , TA.ACA_NM			as cls_aca_nm
+				, CM.CURRI_CONTS AS curri_conts
+				, DATE_FORMAT(CLS.CLASS_SDT, '%Y-%m-%d') AS class_sdt
+				, DATE_FORMAT(CLS.CLASS_EDT, '%Y-%m-%d') AS class_edt
+				, CONCAT(CLS.CLASS_SDT, ' ~ ', CLS.CLASS_EDT) AS class_period
+				,(SELECT USER_NM FROM TB_USER WHERE USER_ID = CTT.TEACHER_ID) AS teacher_nm
+				, CLS_WDAY AS wday
+				, CLS.CLASS_STATUS AS class_status
+				, FC_GET_CODE_NM('CLASS_STATUS', CLS.CLASS_STATUS) AS status_nm
+				, CASE WHEN CAL.CLASS_APPLY_STATUS = '01'
+						THEN FC_GET_CODE_NM('CLASS_APPLY_STATUS', CAL.CLASS_APPLY_STATUS)
+						ELSE CONCAT(CAL.START_DT, ' ', FC_GET_CODE_NM('CLASS_APPLY_STATUS', CAL.CLASS_APPLY_STATUS))
+					END AS class_status_nm
+				, CLS.CLASS_OPR_TP AS class_opr_tp
+				, CASE WHEN CLS.CLASS_OPR_TP = 'TIME'
+						THEN CONCAT('잔여회차: ', FN_GET_REMAIN_CLASS_CNT(CAL.STD_ID, CAL.CLASS_CD))
+                        ELSE CONCAT(INV.LEARN_FDT, ' ~ ', INV.LEARN_TDT)
+				  END AS inv_learn_dt												/* 수강기간 */
+				, IFNULL(INV.APPLY_CNT, 0) AS inv_apply_cnt							/* 수강횟수 */
+				, IFNULL(INV.UNPAY_CNT, 0) AS inv_unpay_chk							/* 미납건 존재 여부 */
+		  		, FORMAT(CLS.CLASS_TOT_AMT, 0) AS class_tot_amt
+		  FROM 	TB_CLASS_STD AS CAL
+				JOIN TB_CLASS AS CLS ON CLS.CLASS_CD = CAL.CLASS_CD
+									AND CLS.USE_YN = 'Y'
+		                            AND CLS.ACA_ID = #{aca_id}
+				JOIN TB_ACA AS TA ON TA.ACA_ID = CLS.ACA_ID
+				LEFT OUTER JOIN (
+						SELECT
+							  CTT.ACA_ID
+							, CTT.CLASS_CD
+							, MIN(CTT.TEACHER_ID) AS TEACHER_ID
+							, GROUP_CONCAT((SELECT CODE_NM FROM TB_CODE AS TC WHERE TC.CODE_GRP_CD = 'DOW' AND TC.CODE = CTT.WDAY AND CTT.TTIME = '1' ORDER BY ORD_NO) ORDER BY CTT.WDAY ASC) AS CLS_WDAY
+						FROM
+							TB_CLASS_TIME_TABLE AS CTT
+						GROUP BY CTT.ACA_ID, CTT.CLASS_CD
+						) AS CTT ON CTT.CLASS_CD = CAL.CLASS_CD
+				LEFT OUTER JOIN TB_CURRI_MST AS CM ON CM.CURRI_CD = CLS.CURRI_CD  
+				LEFT OUTER JOIN	(
+				SELECT 	CLASS_CD
+						, MIN(LEARN_FDT)		AS LEARN_FDT
+						, MAX(LEARN_TDT)		AS LEARN_TDT
+                        , SUM(CASE WHEN USE_YN ='Y' THEN 1 ELSE NULL END) AS APPLY_CNT
+						, SUM(CASE WHEN USE_YN ='Y' AND PAY_YN ='N' AND LEARN_TDT <![CDATA[>=]]> DATE(NOW()) THEN 1 ELSE NULL END) AS UNPAY_CNT
+				  FROM 	TB_INVOICE
+				WHERE 	STD_ID = #{std_id}
+				   and 	ACA_ID = #{aca_id}
+				 GROUP	BY CLASS_CD   
+        		) INV 	ON INV.CLASS_CD  = CAL.CLASS_CD 
+		 WHERE 	CAL.STD_ID = #{std_id}
+		   AND	CAL.ACA_ID = #{aca_id}
+		   AND  CAL.CLASS_APPLY_STATUS IN('01', '02')
+		<choose>
+			<when test="sidx != ''">
+	        	ORDER BY ${sidx} ${sord}
+	       	</when>
+	       	<otherwise>
+	        	ORDER BY CLS.CLASS_STATUS, CAL.APPLY_DT DESC
+	       	</otherwise>
+       	</choose>		
+	</select>
+	
+	<select id="getStdAllianceLectureList" parameterType="hashMap" resultType="hashMap">
+	/* StudentInfoMngMapper.getStdAllianceLectureList */
+		SELECT	SQL_CALC_FOUND_ROWS
+				CAL.STD_ID AS std_id
+				, CAL.CLASS_CD AS class_cd
+		        , DATE_FORMAT(CAL.APPLY_DT, '%Y-%m') AS apply_dt
+				, CLS.SUBJECT_CD AS subject_cd
+		        , FC_GET_CLASS_SUBJECT_NM(CAL.CLASS_CD)		AS subject_nm
+		 		, CLS.CLASS_NM AS class_nm
+		        , CLS.ACA_ID		as cls_aca_id
+		        , TA.ACA_NM			as cls_aca_nm
+				, CM.CURRI_CONTS AS curri_conts
+				, DATE_FORMAT(CLS.CLASS_SDT, '%Y-%m-%d') AS class_sdt
+				, DATE_FORMAT(CLS.CLASS_EDT, '%Y-%m-%d') AS class_edt
+				, CONCAT(CLS.CLASS_SDT, ' ~ ', CLS.CLASS_EDT) AS class_period
+				,(SELECT USER_NM FROM TB_USER WHERE USER_ID = CTT.TEACHER_ID) AS teacher_nm
+				, CTT.CLS_WDAY AS wday
+				, CLS.CLASS_STATUS AS class_status
+				, FC_GET_CODE_NM('CLASS_STATUS', CLS.CLASS_STATUS) AS status_nm
+		        , CASE WHEN CLS.CLASS_OPR_TP = 'TIME'
+						THEN CONCAT('잔여회차: ', FN_GET_REMAIN_CLASS_CNT(CAL.STD_ID, CAL.CLASS_CD))
+                        ELSE CONCAT(INV.LEARN_FDT, ' ~ ', INV.LEARN_TDT)
+				  END AS inv_learn_dt
+		        , IFNULL(INV.APPLY_CNT, 0) AS inv_apply_cnt
+		        , IFNULL(INV.UNPAY_CNT, 0) AS inv_unpay_chk
+		  FROM 	TB_CLASS_STD AS CAL
+				JOIN TB_CLASS AS CLS ON CLS.CLASS_CD = CAL.CLASS_CD
+									AND CLS.USE_YN = 'Y'
+		                            AND CLS.ACA_ID <![CDATA[<>]]> #{aca_id}
+				JOIN TB_ACA AS TA ON TA.ACA_ID = CLS.ACA_ID
+				LEFT OUTER JOIN (
+						SELECT
+							  CTT.ACA_ID
+							, CTT.CLASS_CD
+							, MIN(CTT.TEACHER_ID) AS TEACHER_ID
+							, GROUP_CONCAT((SELECT CODE_NM FROM TB_CODE AS TC WHERE TC.CODE_GRP_CD = 'DOW' AND TC.CODE = CTT.WDAY AND CTT.TTIME = '1' ORDER BY ORD_NO) ORDER BY CTT.WDAY ASC) AS CLS_WDAY
+						FROM
+							TB_CLASS_TIME_TABLE AS CTT
+						GROUP BY CTT.ACA_ID, CTT.CLASS_CD
+						) AS CTT ON CTT.CLASS_CD = CAL.CLASS_CD
+				LEFT OUTER JOIN TB_CURRI_MST AS CM ON CM.CURRI_CD = CLS.CURRI_CD   
+				LEFT OUTER JOIN	(
+								SELECT 	CLASS_CD
+								, STD_ID
+								, MIN(LEARN_FDT)		AS LEARN_FDT
+								, MAX(LEARN_TDT)		AS LEARN_TDT
+		                        , SUM(CASE WHEN USE_YN ='Y' THEN 1 ELSE NULL END) AS APPLY_CNT
+								, SUM(CASE WHEN USE_YN ='Y' AND PAY_YN ='N' AND LEARN_TDT >= DATE(NOW()) THEN 1 ELSE NULL END) AS UNPAY_CNT
+						  FROM 	TB_INVOICE
+						WHERE USE_YN = 'Y'
+						GROUP BY CLASS_CD, STD_ID
+		        ) INV 	ON INV.CLASS_CD  = CAL.CLASS_CD 
+		        		AND INV.STD_ID = CAL.STD_ID
+		 WHERE 	(
+					CAL.STD_ID = #{std_id}
+		            OR
+		            CAL.STD_ID IN (
+									SELECT 	BAU.USER_ID
+									  FROM 	TB_USER TU
+											JOIN TB_USER BAU ON BAU.USER_NM = TU.USER_NM
+																AND BAU.HP_NO = TU.HP_NO
+																AND BAU.USER_ID <![CDATA[<>]]> TU.USER_ID
+																AND BAU.USER_GB_CD = '02'
+																AND	BAU.USE_YN = 'Y'
+									 WHERE TU.USER_ID = #{std_id}
+									 AND LENGTH(TU.HP_NO) > 8
+									)
+					OR
+		            CAL.STD_ID IN (
+									SELECT 	UEM.USER_ID
+									  FROM 	TB_USER TU
+											JOIN TB_USER UEM ON UEM.EMAIL = TU.EMAIL 
+																AND UEM.USER_ID <![CDATA[<>]]> TU.USER_ID
+																AND UEM.USER_GB_CD = '02'
+																AND	UEM.USE_YN = 'Y'
+									 WHERE TU.USER_ID = #{std_id}
+									 AND LENGTH(TU.EMAIL) > 5
+									)
+					
+				) 
+		  AND	CLS.ACA_ID IN ( 
+						SELECT 	ALLIAN_ACA_ID
+						  FROM  TB_ACA_ALLIAN	TAA 
+						 WHERE 	TAA.ACA_ID = #{aca_id}
+		                   AND 	TAA.USE_YN = 'Y'
+		                   AND 	TAA.ACA_ID <![CDATA[<>]]> TAA.ALLIAN_ACA_ID
+						 UNION	ALL
+						SELECT 	'AC00001' ALLI_ACA_ID
+						)
+		AND CAL.CLASS_APPLY_STATUS = '01'
+		<choose>
+			<when test="sidx != ''">
+	        	ORDER BY ${sidx} ${sord}
+	       	</when>
+	       	<otherwise>
+	        ORDER BY CLS.CLASS_STATUS, CAL.APPLY_DT DESC
+	       	</otherwise>
+       	</choose>		
+	</select>
+
+	<select id="getStdBroListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getStdBroListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   B.USER_NM AS bro_std_nm
+		     , A.BRO_STD_ID AS bro_std_id
+		     , C.SCH_NM AS bro_sch_nm
+		     , C.SCH_LVL AS bro_sch_lvl
+		     , (SELECT CODE_NM FROM TB_CODE WHERE CODE_GRP_CD = 'SCH_LVL' AND CODE = C.SCH_LVL) AS bro_sch_lvl_nm
+		     , C.CLS AS bro_cls
+		     ,  CASE WHEN C.BIRTH IS NULL OR C.BIRTH = '' THEN ''
+              		 ELSE (CASE WHEN LEFT(C.BIRTH, 4) = '0000' THEN 0
+            		 			ELSE YEAR(NOW()) - LEFT(C.BIRTH, 4) + 1
+        			 			END)
+              		 END AS bro_age
+		     , FC_GET_CODE_NM('STD_STATUS', C.STD_STATUS) AS bro_std_status_nm
+		  FROM TB_STD_BRO A
+		  LEFT OUTER JOIN TB_USER B
+		    ON A.BRO_STD_ID = B.USER_ID
+		  LEFT OUTER JOIN TB_STD_INFO C
+		    ON A.BRO_STD_ID = C.STD_ID
+		 WHERE 1=1
+		   AND A.STD_ID = #{std_id}
+		   AND B.USE_YN = 'Y'
+	   <choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select>
+
+	<select id="getStdBroSrchListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getStdBroSrchListRetrieve */
+		SELECT A.USER_NM AS bro_find_nm
+		     , A.USER_ID AS bro_find_user_id
+		     , A.TEL_NO AS bro_find_tel_no
+		     , A.HP_NO AS bro_find_hp_no
+		  FROM TB_USER A
+		 WHERE 1=1
+		   AND A.USER_GB_CD = '02'
+ 	       AND A.ACA_ID = (SELECT B.ACA_ID
+	      				     FROM TB_STD_INFO B
+		    				WHERE B.STD_ID = #{std_id})
+		   AND A.USER_ID <![CDATA[<>]]> #{std_id}
+		   AND A.USER_ID NOT IN (SELECT C.BRO_STD_ID
+		    					   FROM TB_STD_BRO C
+		    					  WHERE C.STD_ID = #{std_id})
+		   AND A.USE_YN = 'Y'
+		 <if test="srch_tp != ''">
+		 	<if test="srch_tp == 'name_tp'">
+		 		AND A.USER_NM LIKE CONCAT('%',#{srch_bro_inp},'%')
+		 	</if>
+		 	<if test="srch_tp == 'tel_tp'">
+		 		AND A.TEL_NO LIKE CONCAT('%',#{srch_bro_inp},'%')
+		 	</if>
+		 	<if test="srch_tp == 'hp_tp'">
+		 		AND A.HP_NO LIKE CONCAT('%',#{srch_bro_inp},'%')
+		 	</if>
+		 </if>
+		 <choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.ENT_DTTM DESC
+       		</otherwise>
+      	</choose>
+      	LIMIT ${start}, ${end}
+	</select>
+
+	<insert id="broCreate" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* StudentMngMapper.broCreate */
+		INSERT
+		  INTO TB_STD_BRO ( STD_ID
+				          , BRO_STD_ID
+				          , RESP_TYPE_CD
+				          , ENT_DTTM
+			              , ENT_USER_ID
+			  			  )
+		  		   SELECT #{bro_find_info_std_id}
+		  		    	, #{bro_find_user_id}
+				       	, #{bro_find_resp_type_cd}
+					    , NOW()
+					    , #{ent_user_id}
+			        FROM DUAL
+		ON DUPLICATE KEY UPDATE
+			ENT_DTTM = NOW()
+			, ENT_USER_ID = #{ent_user_id}		        
+	</insert>
+
+	<insert id="broSameCreate" parameterType="com.web.kdebate.student.students.domain.StudentInfoMngVO">
+	/* StudentMngMapper.broSameCreate */
+		INSERT
+		  INTO TB_STD_BRO ( STD_ID
+				          , BRO_STD_ID
+				          , RESP_TYPE_CD
+				          , ENT_DTTM
+			              , ENT_USER_ID
+			  			  )
+		  		   SELECT #{bro_find_user_id}
+		  		    	, #{bro_find_info_std_id}
+				       	, #{bro_find_resp_type_cd}
+					    , NOW()
+					    , #{ent_user_id}
+			        FROM DUAL
+		ON DUPLICATE KEY UPDATE
+			ENT_DTTM = NOW()
+			, ENT_USER_ID = #{ent_user_id}			        
+	</insert>
+
+	<delete id="broDelete" parameterType="hashMap">
+	/* StudentMngMapper.broDelete */
+		DELETE FROM TB_STD_BRO
+		 WHERE STD_ID = #{std_id}
+		   AND BRO_STD_ID = #{bro_std_id}
+	</delete>
+
+	<delete id="broSameDelete" parameterType="hashMap">
+	/* StudentMngMapper.broSameDelete */
+		DELETE FROM TB_STD_BRO
+		 WHERE STD_ID = #{bro_std_id}
+		   AND BRO_STD_ID = #{std_id}
+	</delete>
+
+	<select id="getStdMsgListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getStdMsgListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   PHONE_NUMBER AS msg_phone_number
+		     , CALLBACK AS msg_callback
+		     , TITLE AS msg_title
+		     , MESSAGE AS msg_message
+		     , DATE_FORMAT(REQUEST_DATE, '%Y-%m-%d') AS msg_request_date
+		     , FC_GET_CODE_NM('SMS_STATUS', STATUS) AS msg_status
+		     , FC_GET_CODE_NM('SMS_CONT_TP', SMS_CONT_TP) AS sms_cont_tp_nm
+		  FROM TB_SMS
+		 WHERE (STD_ID = #{std_id} OR STD_ID IN (SELECT PARENT_ID FROM TB_PARENTS WHERE STD_ID = #{std_id}))
+		 <if test="aca_id != 'AC00001'">
+		 	  AND ACA_ID = #{aca_id}
+		 </if>
+
+  		<if test="srch_st_inp != '' or srch_ed_inp != ''">
+	 		<choose>
+	 			<when test="srch_st_inp != '' and srch_ed_inp == ''">
+	 				AND REQUEST_DATE <![CDATA[>=]]> #{srch_st_inp}
+	 			</when>
+	 			<when test="srch_st_inp == '' and srch_ed_inp != ''">
+	 				AND REQUEST_DATE <![CDATA[<=]]> #{srch_ed_inp}
+	 			</when>
+	 			<otherwise>
+	 				AND REQUEST_DATE BETWEEN #{srch_st_inp} AND #{srch_ed_inp}
+	 			</otherwise>
+	 		</choose>
+ 		</if>
+ 		<if test="srch_sms_cont_tp != '' and srch_sms_cont_tp != null">
+ 			AND SMS_CONT_TP = #{srch_sms_cont_tp}
+ 		</if>
+ 		<if test="srch_tp != ''">
+		 	<if test="srch_tp == 'rev_tp'">
+		 		AND PHONE_NUMBER LIKE CONCAT('%',#{srch_std_msg_inp},'%')
+		 	</if>
+		 	<if test="srch_tp == 'sen_tp'">
+		 		AND CALLBACK LIKE CONCAT('%',#{srch_std_msg_inp},'%')
+		 	</if>
+		</if>
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY SEQ DESC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select>
+
+	<select id="getGoodsInfo" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getGoodsInfo */
+		SELECT A.TOT_AMT AS gds_tot_amt
+			 , A.GOODS_PAY_DIV_CHK AS gds_pay_div_chk
+			 , A.GOODS_PAY_CALC_TP AS gds_pay_calc_tp
+			 , A.GOODS_PAY_CALC_VAL AS gds_pay_calc_val
+             , (SELECT WDAY
+	   			  FROM TB_STD_TIME_TABLE
+ 	   			 WHERE ACA_ID = #{corp_cd}
+ 	   			   AND STD_ID = #{std_id}
+ 	   			 ORDER BY ENT_DTTM DESC
+ 	   			 LIMIT 1) AS std_wday
+		  FROM TB_CORP_GOODS A
+		 WHERE 1=1
+		   AND A.CORP_CD = #{corp_cd}
+		   AND A.GOODS_CD = #{goods_cd}
+	</select>
+
+
+	<select id="getLessonEndDate" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getLessonEndDate */
+		SELECT FN_GET_LESSON_END_DATE(#{aca_id}, #{std_id}, #{learn_fdt}, #{learn_cnt}) AS learn_tdt
+  		  FROM DUAL
+	</select>
+
+	<select id="getStdChgLogListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getStdChgLogListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			  SLOG.CHG_SEQ AS chg_seq
+			, SLOG.ACA_ID AS chg_aca_id
+	        , TA.ACA_NM AS chg_aca_nm
+	        , SLOG.STD_STATUS AS chg_std_status
+			, TC1.CODE_NM AS chg_std_status_nm
+			, SLOG.CHG_REASON_CD AS chg_reason_cd
+	        , TC2.CODE_NM AS chg_reason_nm
+	        , SLOG.CHG_REASON_MEMO AS chg_reason_memo
+			, NVL(TC.CLASS_NM, '') AS class_nm
+	        , CONCAT( SLOG.CHG_REASON_MEMO  
+					, CASE WHEN SLOG.CLASS_CD IS NULL THEN '' ELSE CONCAT(' / 학급명 : ', TC.CLASS_NM) END
+					) AS class_memo
+			, SLOG.USE_YN AS chg_use_yn
+			, SLOG.STD_ID AS chg_std_id
+	        , DATE_FORMAT(SLOG.CHG_DT, '%Y-%m-%d') AS chg_dt
+	        , DATE_FORMAT(SLOG.RETURN_DT, '%Y-%m-%d') AS return_dt
+		  	, DATE_FORMAT(SLOG.ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS chg_ent_dttm
+		    , SLOG.ENT_USER_ID AS chg_ent_user_id
+		  FROM
+	  		TB_STD_INFO_CHG_LOG SLOG
+			JOIN TB_ACA	TA
+				ON TA.ACA_ID = SLOG.ACA_ID
+			JOIN TB_CODE TC1
+				ON TC1.CODE = SLOG.STD_STATUS
+				AND TC1.CODE_GRP_CD = 'STD_STATUS'
+	        JOIN TB_CODE TC2
+	        	ON TC2.CODE = SLOG.CHG_REASON_CD
+				AND TC2.CODE_GRP_CD = 'CHG_REASON_CD'
+	        LEFT OUTER JOIN TB_CLASS TC
+        		ON TC.CLASS_CD = SLOG.CLASS_CD
+		 WHERE SLOG.STD_ID = #{std_id}
+		   AND SLOG.USE_YN = 'Y'
+	    <choose>
+		   	<when test='chg_care_chk == "Y"'>
+		   		AND SLOG.CHG_GB = 'L'
+		   	</when>
+		   	<otherwise>
+		   		AND SLOG.CHG_GB = 'A'
+		   	</otherwise>
+	    </choose>
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY SLOG.CHG_SEQ DESC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select>
+
+	<!-- <select id="getStdChgLogListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getStdChgLogListRetrieve */
+		SELECT SQL_CALC_FOUND_ROWS
+			   A.CHG_SEQ AS chg_seq
+		     , A.STD_ID AS chg_std_id
+		     , DATE_FORMAT(A.CHG_DT, '%Y-%m-%d') AS chg_dt
+		     , A.STD_STATUS AS chg_std_status
+		     , FC_GET_CODE_NM('STD_STATUS', A.STD_STATUS) AS chg_std_status_nm
+		     , A.CHG_REASON_CD AS chg_reason_cd
+		     , FC_GET_CODE_NM('CHG_REASON_CD', A.CHG_REASON_CD) AS chg_reason_nm
+		     , A.CHG_REASON_MEMO AS chg_reason_memo
+		     , DATE_FORMAT(A.ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS chg_ent_dttm
+		     , A.ENT_USER_ID AS chg_ent_user_id
+		     , A.USE_YN AS chg_use_yn
+		     , DATE_FORMAT(A.RETURN_DT, '%Y-%m-%d') AS return_dt
+		     , (SELECT ACA_NM FROM TB_ACA WHERE ACA_ID = A.ACA_ID) AS chg_aca_nm
+		  FROM TB_STD_INFO_CHG_LOG A
+		 WHERE A.STD_ID = #{std_id}
+		   AND A.USE_YN IN ('Y','C')
+		   <choose>
+		   	<when test='chg_care_chk == "Y"'>
+		   		AND A.CHG_GB = 'L'
+		   	</when>
+		   	<otherwise>
+		   		AND A.CHG_GB = 'A'
+		   	</otherwise>
+		   </choose>
+		<choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY A.CHG_SEQ DESC
+       		</otherwise>
+      	</choose>
+		 LIMIT ${start}, ${end}
+	</select> -->
+
+	<select id="getChgReasonList" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getChgReasonList */
+		SELECT CODE AS "code"
+			 , CODE_NM AS "code_nm"
+  		  FROM TB_CODE
+ 		 WHERE CODE_GRP_CD = 'CHG_REASON_CD'
+   		   AND USE_YN = 'Y'
+   		   AND CODE !='CODE'
+	   	   AND CHK_CD1 = #{std_status}
+	  ORDER BY ORD_NO
+	</select>
+
+	<select id="getStdAtdLeftCnt" parameterType="hashMap" resultType="int">
+	/* StudentMngMapper.getStdAtdLeftCnt */
+		SELECT COUNT(1)
+		  FROM TB_STD_ATD
+		 WHERE CHK_YN = 'D'
+		   AND CLASS_TP = 'NOR'
+		   AND STD_ID = #{chg_log_std_id}
+	</select>
+
+	<insert id="chgLogInfoCreate" parameterType="hashMap">
+	/* StudentMngMapper.chgLogInfoCreate */
+		INSERT INTO TB_STD_INFO_CHG_LOG
+			( STD_ID
+			, CHG_DT
+			, CHG_GB
+			, STD_STATUS
+			, CHG_REASON_CD
+			, CHG_REASON_MEMO
+			, ENT_DTTM
+			, ENT_USER_ID
+			, USE_YN
+			, RETURN_DT
+			, ACA_ID
+			)
+	  VALUES ( #{chg_log_std_id}
+	 	     , #{chg_dt}
+	 	     <choose>
+	 	     	<when test='chg_care_chk == "Y"'>
+	 	     	, 'L'
+	 	     	</when>
+	 	     	<otherwise>
+	 	     	, 'A'
+	 	     	</otherwise>
+	 	     </choose>
+	 	     , #{chg_std_status}
+	 	     , #{chg_reason_cd}
+	 	     , #{chg_reason_memo}
+	 	     , NOW()
+	 	     , #{ent_user_id}
+	 	     , 'Y'
+	 	     , #{return_dt}
+	 	     , (SELECT ACA_ID
+         		  FROM TB_STD_INFO
+        		 WHERE STD_ID = #{chg_log_std_id})
+	 	    )
+	</insert>
+
+	<insert id="stdAtdInfoCreate" parameterType="hashMap">
+	/* StudentMngMapper.stdAtdInfoCreate */
+		INSERT INTO TB_STD_ATD
+			( ATD_DT
+			, STD_ID
+			, TTIME
+			, INVOICE_NO
+			, ACA_ID
+			, ROOM_NO
+			, WDAY
+			, TEACH_ID
+			, CLASS_TP
+			, ENT_DTTM
+			, ENT_USER_ID
+			, CHK_YN
+			)
+		SELECT FN_GET_LESSON_DATE_ADDWEEK(T2.ACA_ID, T2.STD_ID, DATE_FORMAT(NOW(), '%Y-%m-%d'), T2.WDAY, T2.ADD_WEEK) AS ATD_DT -- 복귀일로부터 N차의 수업일
+			 , T2.STD_ID
+			 , T2.TTIME
+			 , T2.INVOICE_NO AS INVOICE_NO
+			 , T2.ACA_ID
+			 , T2.ROOM_NO
+			 , T2.WDAY
+			 , T2.TEACH_ID
+			 , T2.CLASS_TP
+			 , NOW() AS ENT_DTTM
+			 , T2.ENT_USER_ID AS ENT_USER_ID
+			 , 'Y'
+		 FROM (SELECT @rownum:=@rownum+1 AS ADD_WEEK
+					, T1.*
+				 FROM TB_STD_ATD T1
+					, (SELECT @rownum:=0 FROM DUAL) b
+				WHERE STD_ID = #{std_id}
+				  AND ACA_ID = #{aca_id}
+				  AND CLASS_TP = 'NOR'
+				  AND CHK_YN = 'D'
+				ORDER BY T1.ATD_DT
+			   ) T2
+		   ON DUPLICATE KEY UPDATE ROOM_NO = T2.ROOM_NO
+			, WDAY = T2.WDAY
+			, TEACH_ID = T2.TEACH_ID
+			, CLASS_TP = T2.CLASS_TP
+			, UPT_DTTM = NOW()
+			, UPT_USER_ID = T2.ENT_USER_ID
+			, CHK_YN = 'Y'
+	</insert>
+
+	<update id="chgLogInfoUpdate" parameterType="hashMap">
+	/* StudentMngMapper.chgLogInfoUpdate */
+		UPDATE TB_STD_INFO_CHG_LOG
+		   SET USE_YN = "N"
+		 WHERE 1=1
+		 <choose>
+		 	<when test="compare_now.equals('Y'.toString())">
+		 		AND (CHG_DT <![CDATA[>]]> DATE(NOW()) OR DATE(#{chg_dt}) BETWEEN CHG_DT AND RETURN_DT)
+		 	</when>
+		 	<otherwise>
+		 		AND (CHG_DT <![CDATA[>]]> DATE(#{chg_dt}) OR DATE(#{chg_dt}) BETWEEN CHG_DT AND RETURN_DT)
+		 	</otherwise>
+		 </choose>
+		   AND STD_ID = #{chg_log_std_id}
+		   AND STD_STATUS IN ('02', '03')
+	</update>
+
+	<update id="stdAtdInfoUpdate" parameterType="hashMap">
+	/* StudentMngMapper.stdAtdInfoUpdate */
+	UPDATE TB_STD_ATD
+       SET CHK_YN = 'N'
+     WHERE ACA_ID = #{aca_id}
+       AND STD_ID = #{std_id}
+       AND CHK_YN = 'D'
+	</update>
+
+	<select id="getMaxInvoiceNo" parameterType="hashMap" resultType="string">
+	/* StudentMngMapper.getMaxInvoiceNo */
+		SELECT MAX(TSA.INVOICE_NO) AS invoice_no
+       	  FROM TB_STD_ATD TSA
+         WHERE TSA.STD_ID = #{std_id}
+           AND TSA.ACA_ID = #{aca_id}
+           AND CHK_YN = 'Y'
+	</select>
+
+	<update id="stdLernDtlUpdate" parameterType="hashMap">
+	/* StudentMngMapper.stdLernDtlUpdate */
+	UPDATE TB_STD_LERN_DTL T1
+       , (SELECT A.STD_ID
+       		  , A.INVOICE_NO
+       		  , FN_GET_WEEK_END_DATE(MAX(A.ATD_DT)) AS FDT
+           FROM TB_STD_ATD A
+          WHERE A.STD_ID = #{std_id}
+            AND A.ACA_ID = #{aca_id}
+            AND A.INVOICE_NO = #{invoice_no}
+          GROUP BY A.STD_ID, A.INVOICE_NO
+          ) T2
+  	  SET T1.END_DT = T2.FDT
+ 	WHERE T1.STD_ID = T2.STD_ID
+   	  AND T1.INVOICE_NO = T2.INVOICE_NO
+	</update>
+
+	<select id="getStudentMbrTp" parameterType="hashMap" resultType="string">
+	/* StudentMngMapper.getStudentMbrTp */
+		SELECT
+			STD_MBR_TP
+		FROM
+			TB_STD_INFO
+		WHERE
+			STD_ID = #{chg_log_std_id}
+	</select>
+
+	<update id="stdStatusUpdate" parameterType="hashMap">
+	/* StudentMngMapper.stdStatusUpdate */
+	UPDATE TB_STD_INFO SET
+		<choose>
+			<when test='chg_care_chk == "Y"'>
+			STD_CARE_STATUS = #{chg_std_status}	
+			</when>
+			<otherwise>
+			STD_STATUS = #{chg_std_status}
+			</otherwise>
+		</choose>		
+     WHERE STD_ID = #{chg_log_std_id}
+	</update>
+
+	<update id="chgLogInfoDelete" parameterType="hashMap">
+	/* StudentMngMapper.chgLogInfoDelete */
+	UPDATE TB_STD_INFO_CHG_LOG
+       SET USE_YN = 'N'
+     WHERE CHG_SEQ = #{chg_seq}
+       AND STD_ID = #{chg_log_std_id}
+	</update>
+
+	<update id="chgLogRetInfoUpdate" parameterType="hashMap">
+	/* StudentMngMapper.chgLogRetInfoUpdate */
+	UPDATE TB_STD_INFO_CHG_LOG
+       SET 
+      	 <choose>
+				<when test='(chg_dt != null and chg_dt != "") and (return_dt == null or return_dt == "")'>
+					  CHG_DT = #{chg_dt}
+				</when>
+				<otherwise>
+					  RETURN_DT = #{return_dt}
+					, CHG_DT = #{chg_dt}
+				</otherwise>
+			</choose>
+     WHERE CHG_SEQ = #{chg_seq}
+       AND STD_ID = #{chg_log_std_id}
+	</update>
+
+	<select id="getReasonChkCd" parameterType="hashMap" resultType="string">
+	/* StudentMngMapper.getReasonChkCd */
+		SELECT CHK_CD2 AS chk_cd2
+  		  FROM TB_CODE
+ 		 WHERE CODE_GRP_CD = 'CHG_REASON_CD'
+   		   AND USE_YN = 'Y'
+   		   AND CODE = #{chg_reason_cd}
+   		   AND CHK_CD2 = 'R'
+	</select>
+
+	<update id="stdAtdChkUpdate" parameterType="hashMap">
+	/* StudentMngMapper.stdAtdChkUpdate */
+	UPDATE TB_STD_ATD
+       SET CHK_YN = 'D'
+     WHERE STD_ID = #{chg_log_std_id}
+     <choose>
+	 	<when test="compare_now.equals('Y'.toString())">
+	 		AND ATD_DT <![CDATA[>=]]> DATE(NOW())
+	 	</when>
+	 	<otherwise>
+	 	    AND ATD_DT <![CDATA[>=]]> DATE(#{chg_dt})
+	 	</otherwise>
+	 </choose>
+       AND CHK_YN = 'Y'
+	</update>
+
+	<select id="getNextInvPeriod" parameterType="hashMap" resultType="string">
+	/* StudentMngMapper.getNextInvPeriod */
+		SELECT FN_GET_NEXT_INVOICE_PERIOD_SET(#{std_id})
+		  FROM DUAL
+	</select>
+
+	<select id="getStdStatusInfo" parameterType="hashMap" resultType="string">
+	/* StudentMngMapper.getStdStatusInfo */
+		SELECT FC_GET_CODE_NM('STD_STATUS', STD_STATUS) AS std_status
+		  FROM TB_STD_INFO
+		 WHERE STD_ID = #{std_id}
+	</select>
+	<select id="getInvoicePaymentListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentMngMapper.getInvoicePaymentListRetrieve */
+		SELECT
+			DATE_FORMAT(SM.SALES_DT, '%Y-%m') AS pay_dt_ym
+			, SM.SALES_DT AS pay_dt
+			, INV.INVOICE_NO AS invoice_no
+			, INV.INVOICE_NM AS invoice_nm
+			, FC_GET_CODE_NM('PAY_TYPE', SM.PAY_TYPE) AS pay_tp_nm
+		FROM 
+			TB_INVOICE INV
+		JOIN 
+			TB_INVOICE_CORP_PAY_MAP MAP ON MAP.INVOICE_NO = INV.INVOICE_NO
+		JOIN 
+			TB_SALES_MST SM ON SM.SALES_NO = MAP.SALES_NO AND SM.CORP_CD = MAP.CORP_CD
+		WHERE 
+			INV.STD_ID = #{std_id}
+			AND INV.PAY_YN IN ( 'Y', 'P')
+		ORDER BY SM.SALES_DT	
+	</select>
+	<select id="getStdAtdListRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT SQL_CALC_FOUND_ROWS
+		    DATE_FORMAT(ATD_DT, '%m-%d') AS atd_dt
+           , CR.ROOM_NM AS room_nm
+           , TU.USER_NM AS user_nm
+           , CASE WHEN SA.WDAY = 0 THEN '일' WHEN SA.WDAY = 1 THEN '월' WHEN SA.WDAY = 2 THEN '화' WHEN SA.WDAY = 3 THEN '수' WHEN SA.WDAY = 4 THEN '목' WHEN SA.WDAY = 5 THEN '금' WHEN SA.WDAY = 6 THEN '토'  END AS wday
+           , CONCAT(TT.TTIME, '교시', ' (', TT.STR_TM, ' ~ ', TT.END_TM, ')') AS ttime
+           , FC_GET_CODE_NM('CLASS_TP', SA.CLASS_TP) AS class_tp
+           , FC_GET_CODE_NM('ATD_CD', SA.ATD_CD) AS atd_cd
+           , DATE_FORMAT(SA.ATD_CHK_DTTM, '%H:%m')  AS atd_chk_dttm
+           , NVL(SA.DAY_MEMO, '') AS day_memo
+	   FROM TB_STD_ATD SA
+	   LEFT JOIN TB_CLASS_ROOM CR ON CR.ROOM_NO = SA.ROOM_NO AND CR.ACA_ID = SA.ACA_ID
+	   LEFT JOIN TB_CLASS_TIME_TABLE TT ON TT.ROOM_NO = SA.ROOM_NO AND TT.ACA_ID = SA.ACA_ID AND TT.WDAY = SA.WDAY AND TT.TTIME = SA.TTIME
+	   LEFT JOIN TB_USER TU ON TU.USER_ID = TT.TEACHER_ID
+	   WHERE SA.STD_ID = #{std_id}
+	   AND SA.ATD_DT BETWEEN #{srch_st_atd_dt} AND #{srch_ed_atd_dt}
+	   <if test="srch_class_tp != ''">
+	   AND SA.CLASS_TP = #{srch_class_tp}
+	   </if>
+	   <choose>
+       		<when test="sidx != ''">
+        		ORDER BY ${sidx} ${sord}
+       		</when>
+       		<otherwise>
+        		ORDER BY SA.ATD_DT DESC
+       		</otherwise>
+      	</choose>
+      	LIMIT ${start}, ${end}
+	</select>
+
+	<select id="getStdAtdListDtlRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getStdAtdListDtlRetrieve */
+		SELECT
+			  SQL_CALC_FOUND_ROWS
+			  TSA.CLASS_CD AS class_cd
+			, TSA.STD_ID AS std_id
+			, CONCAT(DATE_FORMAT(TSA.ATD_DT, '%Y-%m-%d'), ' (', FN_GET_WEEKDAY_NM(TCTT.WDAY) ,')') AS atd_dt
+			, TC.CLASS_NM AS class_nm
+			, TCTT.TEACHER_ID AS teacher_id
+			, TU.USER_NM AS teacher_nm
+			, CONCAT(TCTT.TTIME, '교시(', TCTT.STR_TM, ' ~ ',TCTT.END_TM, ')') AS class_tm
+			, FC_GET_CODE_NM('CLASS_TP', TC.CLASS_TP) AS class_tp
+			, CONCAT(CASE WHEN TSA.ATD_GB = 'S' THEN '[보]' ELSE '' END
+						, CASE WHEN TSA.ATD_CD IS NULL THEN '예약' ELSE FC_GET_CODE_NM('ATD_CD', TSA.ATD_CD) END
+                    ) AS std_atd
+			, DATE_FORMAT(TSA.ATD_CHK_DTTM, '%H:%i') AS atd_dttm
+			, TSA.DAY_MEMO AS memo
+			, TA.ACA_NM AS aca_nm
+			, IFNULL(TRSD.RPT_SEQ, '') AS rpt_seq
+			, TCTT.TTIME AS ttime
+		FROM
+			TB_STD_ATD TSA
+		JOIN 
+			TB_CLASS AS TC ON TC.CLASS_CD = TSA.CLASS_CD
+		LEFT OUTER JOIN 
+			TB_CLASS_TIME_TABLE AS TCTT ON TCTT.CLASS_CD = TSA.CLASS_CD AND TCTT.WDAY = (DAYOFWEEK(TSA.ATD_DT) -1)
+		JOIN
+			TB_ACA TA ON TA.ACA_ID = TC.ACA_ID
+		LEFT OUTER JOIN
+			TB_USER AS TU ON TU.USER_ID = TCTT.TEACHER_ID
+		LEFT OUTER JOIN
+			TB_RPT_STD_DEBATE TRSD ON TRSD.CLASS_CD = TC.CLASS_CD
+								AND TRSD.STD_ID = #{std_id}
+								AND TSA.ATD_DT = TRSD.ATD_DT
+		WHERE
+			TSA.STD_ID = #{std_id}
+			<if test='srch_atd_class_tp != "" and srch_atd_class_tp != null'>
+				AND TC.CLASS_TP = #{srch_atd_class_tp}
+			</if>
+			<if test='srch_std_st_atd_dt != "" and srch_std_ed_atd_dt != "" and srch_std_st_atd_dt != null and srch_std_ed_atd_dt != null'>
+				AND TSA.ATD_DT BETWEEN #{srch_std_st_atd_dt} AND #{srch_std_ed_atd_dt}
+			</if>
+			<if test='debate_class_cd != "" and debate_class_cd != null'>
+				AND TC.CLASS_CD = #{debate_class_cd}
+			</if>
+			<if test='srch_center != "" and srch_center != null'>
+				AND TA.ACA_ID = #{srch_center}
+			</if>
+		GROUP BY TSA.CLASS_CD, TSA.ATD_DT
+		ORDER BY
+			TSA.ATD_DT DESC, TC.CLASS_NM, TCTT.TTIME ASC
+		LIMIT
+			${start}, ${end}
+	</select>
+
+	<select id="getShuttleScheduleList" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getShuttleScheduleList */
+		SELECT
+			SQL_CALC_FOUND_ROWS
+			S.BUS_SCHD_NO AS bus_schd_no
+			, S.BUS_LINE_NO AS bus_line_no
+			, BS.BUS_STATION_ID AS bus_sta_id
+			, S.BUS_NO AS bus_no
+			, S.BUS_SCHD_NM AS bus_schd_nm
+			, B.BUS_NM AS bus_nm
+			, STA.STATION_NM AS sta_nm
+			, BS.ARRIVE_TM AS arr_tm
+			, S.USE_YN AS use_yn
+			, S.START_TM AS start_tm
+			, CASE
+			  WHEN S.WDAY = '1' THEN '월요일' WHEN S.WDAY = '2' THEN '화요일' WHEN S.WDAY = '3' THEN '수요일' WHEN S.WDAY = '4' THEN '목요일'
+			  WHEN S.WDAY = '5' THEN '금요일' WHEN S.WDAY = '6' THEN '토요일' WHEN S.WDAY = '0' THEN '일요일'
+			  END AS day
+			, S.WDAY AS wday
+			, FC_GET_CODE_NM('BUS_ATD_CD' ,M.BUS_ATD_CD) AS bus_atd_cd_nm
+			, IFNULL(S.UPT_USER_ID, S.ENT_USER_ID) AS upt_user_id
+			, IFNULL(DATE_FORMAT(S.UPT_DTTM, '%Y-%m-%d'), DATE_FORMAT(S.ENT_DTTM, '%Y-%m-%d')) AS upt_dt
+		FROM
+			TB_BUS_LINE_SCHEDULE AS S
+		INNER JOIN TB_BUS_LINE_STATION AS BS ON S.BUS_SCHD_NO = BS.BUS_SCHD_NO
+		RIGHT OUTER JOIN TB_BUS_STATION AS STA ON BS.BUS_STATION_ID = STA.BUS_STATION_ID
+		INNER JOIN
+			TB_BUS AS B ON S.BUS_NO = B.BUS_NO AND B.USE_YN = 'Y'
+		LEFT OUTER JOIN 
+			TB_BUS_LINE_MST AS M ON S.BUS_LINE_NO = M.BUS_LINE_NO AND M.USE_YN = 'Y'	
+		LEFT OUTER JOIN
+			TB_USER AS U ON S.DRIVER_ID = U.USER_ID
+		LEFT OUTER JOIN
+			TB_USER AS H1 ON S.DRIVE_HELPER1_ID = H1.USER_ID
+		LEFT OUTER JOIN
+			TB_USER AS H2 ON S.DRIVE_HELPER2_ID = H2.USER_ID
+		WHERE
+			S.ACA_ID = #{stt_aca_id}
+			<if test='stt_line_mst != null and stt_line_mst !=""'>
+			AND	S.BUS_LINE_NO = #{stt_line_mst}
+			</if>
+			<if test='stt_line_sta != null and stt_line_sta != ""'>
+			AND BS.BUS_STATION_ID = #{stt_line_sta}
+			</if>
+			<if test="checkDayCnt != 0">
+			AND S.WDAY IN 			
+				<foreach item="item" index="index" collection="checkDay" open="(" separator="," close=")">
+					#{item}
+				</foreach>
+			</if>
+		   AND BS.ARRIVE_TM IS NOT NULL
+		   AND S.USE_YN = 'Y'
+		<choose>
+			<when test="sidx != ''">
+				ORDER BY ${sidx} ${sord}
+			</when>
+			<otherwise>
+				ORDER BY S.WDAY, START_TM ASC
+			</otherwise>
+		</choose>
+
+	</select>
+
+	<select id="getSelectStdShuttleSchList" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getSelectStdShuttleSchList */
+		SELECT
+		 	SQL_CALC_FOUND_ROWS
+			A.*
+		FROM
+			(
+			SELECT
+				A.BUS_SCHD_NO AS bus_schd_no
+				, A.BUS_LINE_NO AS bus_line_no
+				, A.BUS_STATION_ID AS bus_sta_id
+				, C.BUS_SCHD_NM AS bus_schd_nm
+				, S.STATION_NM AS sta_nm
+				, A.BOARD_GB AS board_gb
+				, A.MEMO AS memo
+				, B.ARRIVE_TM AS arr_tm
+				, CASE WHEN C.WDAY = '1' THEN '월요일'
+					   WHEN C.WDAY = '2' THEN '화요일'
+					   WHEN C.WDAY = '3' THEN '수요일'
+					   WHEN C.WDAY = '4' THEN '목요일'
+					   WHEN C.WDAY = '5' THEN '금요일'
+					   WHEN C.WDAY = '6' THEN '토요일'
+					   WHEN C.WDAY = '0' THEN '일요일'
+				  END AS days
+				, C.WDAY AS wday
+			FROM
+				TB_BUS_STATION_MEMBER AS A
+			LEFT OUTER JOIN
+				TB_BUS_STATION AS S ON A.BUS_STATION_ID = S.BUS_STATION_ID
+			LEFT OUTER JOIN
+				TB_BUS_LINE_STATION AS B ON A.BUS_STATION_ID = B.BUS_STATION_ID AND A.BUS_LINE_NO = B.BUS_LINE_NO AND A.BUS_SCHD_NO = B.BUS_SCHD_NO
+			LEFT OUTER JOIN
+				TB_BUS_LINE_SCHEDULE AS C ON A.BUS_SCHD_NO = C.BUS_SCHD_NO AND C.USE_YN = 'Y'
+			WHERE
+				A.STD_ID = #{stt_std_id}
+		) AS A
+			<choose>
+				<when test="sidx != ''">
+					ORDER BY ${sidx} ${sord}
+				</when>
+				<otherwise>
+					ORDER BY A.wday, A.arr_tm ASC
+				</otherwise>
+			</choose>
+
+	</select>
+
+	<select id="getChkStdStatus" parameterType="hashMap" resultType="string">
+	/* mapper.getChkStdStatus */
+		SELECT
+			STD_STATUS
+		FROM
+			TB_STD_INFO
+		WHERE
+			STD_ID = #{std_id}
+	</select>
+
+	<select id="chkStdShuttleSChedule" parameterType="hashMap" resultType="int">
+	/* mapper.chkStdShuttleChedule */
+		SELECT
+			COUNT(*)
+		FROM
+			TB_BUS_STATION_MEMBER
+		WHERE
+			BUS_SCHD_NO = #{bus_schd_no}
+			AND BUS_LINE_NO = #{bus_line_no}
+			AND BUS_STATION_ID = #{bus_sta_id}
+			AND STD_ID = #{std_id}
+	</select>
+
+	<select id="chkStdShttleDuplicateSchedule" parameterType="hashMap" resultType="int">
+	/* mapper.chkStdShttleDuplicateSchedule */
+		SELECT
+			COUNT(1)
+		FROM
+			TB_BUS_STATION_MEMBER AS A
+		INNER JOIN
+			TB_BUS_LINE_SCHEDULE AS B ON A.BUS_SCHD_NO = B.BUS_SCHD_NO
+		WHERE
+			STD_ID = #{std_id}
+			AND B.WDAY = (SELECT
+							WDAY
+						  FROM
+						  	TB_BUS_LINE_SCHEDULE
+						  WHERE
+						  	BUS_SCHD_NO = ${bus_schd_no}
+						  )
+	</select>
+
+	<select id="getChkBusSeatStatus" parameterType="hashMap" resultType="string">
+	/* mapper.getChkBusSeatStatus */
+		SELECT
+			IF(B.BUS_CAPA <![CDATA[<=]]> IFNULL((SELECT COUNT(BUS_SCHD_NO)
+				FROM TB_BUS_STATION_MEMBER A
+				JOIN TB_STD_INFO B ON A.STD_ID = B.STD_ID
+				WHERE BUS_SCHD_NO = #{bus_schd_no} AND BUS_LINE_NO = A.BUS_LINE_NO
+					  AND B.STD_STATUS IN ('01', '07')
+				), 0), 'over', 'available') AS seat_status
+		FROM
+			TB_BUS_LINE_SCHEDULE AS A
+		LEFT OUTER JOIN
+			TB_BUS AS B ON A.BUS_NO = B.BUS_NO
+		WHERE
+			A.BUS_SCHD_NO = #{bus_schd_no}
+	</select>
+
+	<insert id="addStdShuttleMember" parameterType="hashMap">
+	/* mapper.addStdShuttleMember */
+		INSERT INTO
+			TB_BUS_STATION_MEMBER
+			(
+			 BUS_SCHD_NO
+			 , BUS_LINE_NO
+			 , BUS_STATION_ID
+			 , STD_ID
+			 , BOARD_GB
+			 , MEMO
+			 , ENT_DTTM
+			 , ENT_USER_ID
+			) VALUES (
+			 #{bus_schd_no}
+			 , #{bus_line_no}
+			 , #{bus_sta_id}
+			 , #{std_id}
+			 , #{board_gb}
+			 , #{board_memo}
+			 , NOW()
+			 , #{user_id}
+			)
+
+	</insert>
+
+	<delete id="delStdShuttleBoardSch" parameterType="hashMap">
+	/* mapper.delStdShuttleBoardSch */
+		DELETE
+			FROM TB_BUS_STATION_MEMBER
+		WHERE
+			BUS_SCHD_NO = #{bus_schd_no}
+			AND BUS_LINE_NO = #{bus_line_no}
+			AND BUS_STATION_ID = #{bus_sta_id}
+			AND STD_ID = #{std_id}
+	</delete>
+
+	<select id="getSelectStdShuttleSchedule" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getSelectStdShuttleSchedule */
+		SELECT
+			CONCAT(A.BUS_SCHD_NM, ' 외 ', CAST(COUNT(1) - 1 AS VARCHAR(1)), '건')	AS bus_schd_nm
+		FROM
+			TB_BUS_LINE_SCHEDULE AS A
+		LEFT JOIN
+			TB_BUS_STATION_MEMBER AS B ON A.BUS_SCHD_NO = B.BUS_SCHD_NO
+		WHERE
+			A.USE_YN = 'Y'
+			AND B.STD_ID = #{std_id}
+		ORDER BY
+			A.BUS_SCHD_NO ASC
+	</select>
+
+	<select id="getAcaClassList" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getAcaClassList */
+		SELECT
+			  TC.CLASS_CD
+			, TC.CLASS_NM
+			, FORMAT(TC.CLASS_TOT_AMT, 0) AS TOT_AMT
+		FROM 
+			TB_CLASS TC
+		<if test='auth_grp_cd == "AG0102"'>
+       		JOIN (
+				SELECT
+					  CLASS_CD
+					, TEACHER_ID
+					, TEACHER_ID2
+				FROM TB_CLASS_TIME_TABLE
+				WHERE (
+					TEACHER_ID = #{user_id}
+				OR
+					TEACHER_ID2 = #{user_id}
+				)
+				GROUP BY CLASS_CD
+			) TCTT ON TCTT.CLASS_CD = TC.CLASS_CD
+		</if>
+		WHERE 1=1
+		AND (TC.CLASS_NM != '' AND TC.CLASS_NM IS NOT NULL)
+		AND TC.CLASS_STATUS IN ('00', '01', '03')
+		AND TC.ACA_ID = #{aca_id}
+		AND TC.USE_YN = 'Y'			
+		AND (DATE(NOW()) <![CDATA[<=]]> TC.CLASS_EDT)
+		<if test='class_std_id != null and class_std_id !=""'>
+			<!-- AND TC.CLASS_CD NOT IN (SELECT CLASS_CD FROM TB_CLASS_STD WHERE STD_ID = #{class_std_id}) -->
+			AND NOT EXISTS (
+					SELECT 1
+					FROM TB_CLASS_STD TCS
+					WHERE TCS.CLASS_CD = TC.CLASS_CD
+					AND TCS.STD_ID = #{class_std_id}
+					AND TCS.CLASS_APPLY_STATUS != '03'
+				)
+		</if>
+		<if test='class_cd != null and class_cd !=""'>
+			AND TC.CLASS_CD != #{class_cd}
+		</if>
+		<if test='GB_KEY != null and GB_KEY !=""'>
+			AND TC.CLASS_OPR_TP = #{class_opr_tp}
+		</if>
+		ORDER BY
+			TC.ENT_DTTM DESC
+	</select>
+
+	<select id="getChkStdDuplicateClass" parameterType="hashMap" resultType="int">
+	/* mapper.getChkStdDuplicateClass */
+		SELECT
+			COUNT(1)
+		FROM
+			TB_CLASS_STD
+		WHERE
+			CLASS_CD = #{class_list}
+			AND STD_ID = #{class_std_id}
+			AND CLASS_APPLY_STATUS IN ('00', '01')
+		--	AND  DATE_FORMAT(RECP_DT, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')
+	</select>
+
+	<select id="getClassSeatInfo" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getClassSeatInfo */
+		SELECT
+			C.CLASS_CD AS class_cd
+			, CASE CLASS_ON_CHK WHEN  'Y' THEN C.QUOTA_ON ELSE C.QUOTA END AS quota
+			, (SELECT COUNT(1) FROM TB_CLASS_STD AS CAL WHERE CAL.CLASS_CD = C.CLASS_CD AND CLASS_APPLY_STATUS IN ('00', '01', '02')) AS std_cnt
+		FROM
+			TB_CLASS AS C
+		WHERE
+			C.CLASS_CD = #{class_list}
+	</select>
+
+	<insert id="setStdClassAdd" parameterType="hashMap">
+	/* mapper.setStdClassAdd */
+		INSERT INTO
+			TB_CLASS_STD
+			(
+			 CLASS_CD
+			 , STD_ID
+			 , ACA_ID
+			 , APPLY_DT
+			 , RECP_DT
+			 , ENT_DTTM
+			 , ENT_USER_ID
+			) VALUES (
+			 #{class_list}
+			 , #{class_std_id}
+			 , #{class_aca_id}
+			 , NOW()
+			 , NOW()
+			 , NOW()
+			 , #{user_id}
+			)
+		ON DUPLICATE KEY UPDATE
+			APPLY_DT = NOW()
+			, CLASS_APPLY_STATUS = '01'
+			, START_DT = NOW()
+			, END_DT = NULL
+			, RECP_DT = NOW()	
+			, UPT_DTTM = NOW()
+			, UPT_USER_ID = #{user_id}
+	</insert>
+
+	<delete id="excludeStdClassInfo" parameterType="hashMap">
+	/* mapper.excludeStdClassInfo */
+		DELETE FROM
+			TB_CLASS_STD
+		WHERE
+			CLASS_CD = #{class_cd}
+			AND STD_ID = #{class_std_id}
+	</delete>
+
+	<select id="getSelectAcaExamList" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getSelectAcaExamList */
+		SELECT
+			EXAM_NO AS exam_no
+			, EXAM_NM AS exam_nm
+		FROM
+			TB_EXAM
+		WHERE
+			ACA_ID = #{aca_id}
+			AND EXAM_STATUS = '01'
+			AND USE_YN = 'Y'
+			<if test='std_id != null and std_id != ""'>
+			AND EXAM_NO NOT IN (SELECT EXAM_NO FROM TB_EXAM_STD_APPLY WHERE STD_ID = #{std_id})
+			</if>
+			AND EXAM_DT >= DATE_FORMAT(NOW(), '%Y-%m-%d')
+	</select>
+
+	<select id="getStdExamResultList" parameterType="hashMap" resultType="hashMap">
+	/* mapper.getStdExamResultList */
+		SELECT
+		  SQL_CALC_FOUND_ROWS
+		  A.EXAM_NO AS exam_no
+		  , A.ACA_ID AS exam_aca_id
+		  , TA.ACA_NM AS exam_aca_nm
+		  , A.STD_ID AS std_id
+		  , A.EXAM_NM AS exam_nm
+		  , A.SUBJECT_CD AS subject_cd
+		  , CASE
+				WHEN (SELECT PCODE_USE_YN FROM TB_ACA WHERE ACA_ID = A.ACA_ID ) = 'Y' THEN
+				(SELECT CODE_NM FROM TB_ACA_CODE WHERE ACA_ID = A.ACA_ID AND CODE_GRP_CD = 'SUBJECT_CD' AND CODE = A.SUBJECT_CD )
+				ELSE (SELECT CODE_NM FROM TB_CODE WHERE CODE_GRP_CD = 'SUBJECT_CD' AND CODE = A.SUBJECT_CD)
+			END AS subject_nm
+		  , (SELECT COUNT(1) FROM TB_EXAM_STD_ANSWER WHERE STD_ID = A.STD_ID AND EXAM_NO = A.EXAM_NO AND OX = 'O') AS std_answer_cnt
+		  , CONCAT(CAST((SELECT COUNT(1) FROM TB_EXAM_STD_ANSWER WHERE STD_ID = A.STD_ID AND EXAM_NO = A.EXAM_NO AND OX = 'O') AS CHAR), '/', CAST(A.QUESTION_CNT AS CHAR)) AS question_cnt
+		  , A.EXAM_TP AS exam_tp
+		  , FC_GET_CODE_NM('TEST_GB', A.EXAM_TP) AS exam_tp_nm
+		  , A.EXAM_GB AS exam_gb
+ 		  , FC_GET_CODE_NM("EXAM_GB", A.EXAM_GB) AS exam_gb_nm
+		  , DATE_FORMAT(A.EXAM_DT, '%Y-%m-%d') AS exam_dt
+		  , IFNULL(A.TOTAL_SCORE, '미응시') AS total_score
+		  , A.avg_score
+		  , A.APPLY_DATE AS apply_date
+		  , A.APPLY_TIME AS apply_time
+ 		  , CASE WHEN A.TOTAL_SCORE IS NULL THEN '' ELSE A.RANKING END AS ranking
+		FROM (
+		  SELECT
+		  	ESA.EXAM_NO
+		    , ESA.STD_ID
+			, E.ACA_ID
+			, E.EXAM_NM
+			, E.SUBJECT_CD
+			, E.QUESTION_CNT
+			, E.EXAM_TP
+			, E.EXAM_GB
+			, E.EXAM_DT
+			, ESA.APPLY_DT
+			, DATE_FORMAT(IFNULL(ESA.END_DTTM, ESA.APPLY_DT), '%Y-%m-%d') AS APPLY_DATE
+			, CONCAT(DATE_FORMAT(ESA.STR_DTTM, '%H:%i'), ' ~ ', DATE_FORMAT(ESA.END_DTTM, '%H:%i')) AS APPLY_TIME
+			, ESA.TOTAL_SCORE
+			, (SELECT ROUND(AVG(TOTAL_SCORE), 1) FROM TB_EXAM_STD_APPLY WHERE EXAM_NO = ESA.EXAM_NO ) AS avg_score
+			, RANK() OVER (PARTITION BY ESA.EXAM_NO  ORDER BY ESA.TOTAL_SCORE DESC) AS RANKING
+		  FROM
+		  	TB_EXAM_STD_APPLY AS ESA
+		  JOIN
+		  	TB_EXAM AS E ON ESA.EXAM_NO = E.EXAM_NO
+		  ORDER BY
+		  	EXAM_NO ASC, TOTAL_SCORE DESC
+		) AS A
+		JOIN TB_ACA TA ON TA.ACA_ID = A.ACA_ID
+		WHERE
+			A.STD_ID = #{exam_std_id}
+			<if test='srch_center != "" and srch_center != ""'>
+			AND A.ACA_ID = #{srch_center}
+			</if>
+			<if test='srch_subject_cd != null and srch_subject_cd != ""'>
+			AND A.SUBJECT_CD = #{srch_subject_cd}
+			</if>
+			<if test='srch_exam_tp != null and srch_exam_tp != ""'>
+			AND A.EXAM_TP = #{srch_exam_tp}
+			</if>
+			<if test='srch_exam_gb != null and srch_exam_gb != ""'>
+			AND A.EXAM_GB = #{srch_exam_gb}
+			</if>
+			<if test='srch_st_exam_dt != "" and srch_ed_exam_dt != ""'>
+			AND A.EXAM_DT BETWEEN #{srch_st_exam_dt} AND #{srch_ed_exam_dt}
+			</if>
+		<choose>
+			<when test="sidx != '' and sord !='' and sidx != 'ranking' and sidx != 'total_score'">
+				ORDER BY ${sidx} ${sord}
+			</when>
+			<when test="sidx == 'ranking'">
+				ORDER BY CASE WHEN A.TOTAL_SCORE IS NULL THEN '0' END
+				, A.RANKING ${sord}
+			</when>
+			<when test="sidx == 'total_score'">
+				ORDER BY CASE WHEN A.TOTAL_SCORE IS NULL THEN '0' END
+				, A.TOTAL_SCORE ${sord}
+			</when>
+			<otherwise>
+				ORDER BY A.APPLY_DT DESC, TA.ACA_NM
+			</otherwise>
+		</choose>
+		LIMIT ${start}, ${end}
+	</select>
+
+	<insert id="setStdExamApply" parameterType="hashMap">
+	/* mapper.setStdExamApply */
+		INSERT INTO
+			TB_EXAM_STD_APPLY
+			(
+				EXAM_NO
+				, STD_ID
+				, APPLY_STATUS
+				, APPLY_DT
+				, ENT_DTTM
+				, ENT_USER_ID
+			)
+			SELECT
+				#{cls_exam_info}
+				, #{exam_std_id}
+				, '00'
+				, (SELECT EXAM_DT FROM TB_EXAM WHERE EXAM_NO = #{cls_exam_info})
+				, NOW()
+				, #{user_id}
+			FROM DUAL
+	</insert>
+
+	<insert id="addStdInfoLogChg" parameterType="hashMap">
+	/* mapper.addStdInfoLogChg */
+		INSERT INTO
+			TB_STD_INFO_CHG_LOG
+			(
+			 STD_ID
+			 , STD_STATUS
+			 , CHG_DT
+			 , CHG_REASON_CD
+			 , CHG_REASON_MEMO
+			 , ACA_ID
+			 , USE_YN
+			 , CLASS_CD
+			 , ENT_DTTM
+			 , ENT_USER_ID
+			)
+			SELECT
+			 #{class_std_id}
+			 , #{class_std_status}
+			 , NOW()
+			 , #{class_reason_cd}
+			 , #{class_memo}
+			 , #{class_aca_id}
+			 , 'Y'
+			 , #{class_list}
+			 , NOW()
+			 , #{user_id}
+			FROM DUAL
+
+	</insert>
+
+	<select id="getAcaSchMgtListRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT
+			  ASM.SCH_EDU_MGT_CD	AS code
+			, TC.CODE_NM AS code_nm
+		FROM
+			TB_ACA_SCH_MGT ASM
+		INNER JOIN
+			TB_CODE TC ON TC.CODE_GRP_CD = 'SCH_EDU_MGT_CD' AND TC.CODE = ASM.SCH_EDU_MGT_CD
+		WHERE
+			ACA_ID = #{aca_id}
+	</select>
+
+	<select id="getSchMstListRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentInfoMngMapper.getSchMstListRetrieve */
+		SELECT
+			  SCH_CD AS id
+			, SCH_NM AS text
+		FROM
+			TB_SCHOOL_MST
+		WHERE
+			SCH_GRADE_CD = #{sch_grade_cd}
+			AND SCH_EDU_MGT_CD IN (SELECT SCH_EDU_MGT_CD FROM TB_ACA_SCH_MGT WHERE ACA_ID = #{aca_id})
+			<if test='srch_sch_nm != null and srch_sch_nm != ""'>
+			AND SCH_NM LIKE CONCAT('%', #{srch_sch_nm}, '%')
+			</if>
+	</select>
+
+	<select id="getStdMbrTpListRetrieve" parameterType="hashMap" resultType="hashMap">
+		SELECT
+			  CODE AS code
+			, CODE_NM AS code_nm
+		FROM
+			TB_CODE
+		WHERE
+			CODE_GRP_CD = 'STD_MBR_TP'
+		AND
+			USE_YN = 'Y'
+		AND
+			CODE != 'CODE'
+	</select>
+	
+	<select id="getStdSeatInfo" parameterType="hashMap" resultType="string">
+	/* StudentInfoMngMapper.getStdSeatInfo */
+		SELECT
+			STD_ID
+		FROM
+			TB_STD_INFO
+		WHERE		
+			RESV_SEAT_YN = 'Y'
+			AND RESV_SEAT_ROOM_NO = #{class_room}			
+			AND RESV_SEAT_NO = #{room_seat_no}
+	</select>
+	
+	<update id="updateRoomSeatInfo" parameterType="hashMap">
+	/* StudentInfoMngMapper.updateRoomSeatInfo */
+		UPDATE
+			TB_STD_INFO
+		SET	
+			RESV_SEAT_YN = 'N'
+			, RESV_SEAT_ROOM_NO = NULL
+			, RESV_SEAT_NO = NULL
+			, UPT_DTTM = NOW()
+			, UPT_USER_ID = #{upt_user_id}
+		WHERE
+			STD_ID = #{stdId}	
+	</update>
+	
+	<select id="getStdReadingLvlRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentInfoMngMapper.getStdReadingLvlRetrieve */
+		SELECT
+			    A.LVL_CD
+			  , A.LVL_NM
+			  , B.P_LVL_CD AS std_lvl_cd
+		FROM
+			(
+			SELECT 
+				  LVL_CD AS lvl_cd
+				, LVL_NM AS lvl_nm
+			    , ACA_ID
+			    , SUBJECT_CD
+			FROM TB_ACA_LVL_INFO
+			WHERE 1=1
+			AND	ACA_ID = #{aca_id}
+			AND SUBJECT_CD = '02'
+			AND P_LVL_CD = '02'
+			ORDER BY LVL_CD
+			) A
+		LEFT JOIN
+			(
+				 SELECT    
+					  P_LVL_CD
+					, ACA_ID
+			        , SUBJECT_CD
+				 FROM TB_ACA_LVL_INFO
+				 WHERE 1=1
+				 AND ACA_ID = #{aca_id}
+				 AND SUBJECT_CD = '02'
+				 AND LVL_CD = #{std_lvl_cd}
+				   
+			) B ON A.SUBJECT_CD = B.SUBJECT_CD
+				AND A.ACA_ID = B.ACA_ID
+	</select>
+	
+	<select id="getStdReadingLvl2Depth" parameterType="hashMap" resultType="hashMap">
+	/* StudentInfoMngMapper.getStdReadingLvl2Depth */
+		SELECT 
+			  LVL_CD AS lvl_cd
+			, LVL_NM AS lvl_nm
+		FROM
+			TB_ACA_LVL_INFO
+		WHERE
+			ACA_ID = #{aca_id}
+		AND
+			SUBJECT_CD = '02'
+		AND
+			P_LVL_CD = #{std_p_lvl_cd}
+		ORDER BY LVL_CD
+	</select>
+	
+	<select id="getStdId" resultType="string">
+	/* StudentInfoMngMapper.getStdId */
+		SELECT FN_GET_JOB_SEQ('TB_STD_INFO')
+	</select>
+	
+	<select id="chkUserId" parameterType="string" resultType="int">
+	/* StudentInfoMngMapper.chkUserId */
+		SELECT COUNT(*) AS cnt
+		  FROM TB_USER
+		 WHERE USER_ID = #{info_std_id}
+		 <!-- WHERE USER_ID = #{value} -->
+	</select>
+	
+	<insert id="userInfoCreate" parameterType="com.web.kdebate.student.students.domain.CreateStudentInfoVO">
+	/* StudentInfoMngMapper.userInfoCreate */
+		INSERT INTO TB_USER
+		(
+			ACA_ID
+			, USER_ID
+			, USER_PWD
+			, USER_NM
+			, USER_GB_CD
+			, HP_NO
+			, EMAIL
+			, ZIP_CODE
+			, ADDR
+			, ADDR_DTL
+			, USE_YN
+			, ENT_DTTM
+			, ENT_USER_ID
+		)
+		VALUES(
+			#{aca_id}
+			, TRIM(#{info_std_id})
+			, PASSWORD(#{info_std_pwd})
+			, TRIM(#{std_nm})
+			, '02'
+			, #{hp_no}
+			, #{email}
+			, #{zip_code}
+			, #{addr}
+			, #{addr_dtl}
+			, #{std_use_yn}
+			, NOW()
+			, #{ent_user_id}
+		)
+	</insert>
+
+	<insert id="studentInfoCreate" parameterType="com.web.kdebate.student.students.domain.CreateStudentInfoVO">
+	/* StudentInfoMngMapper.studentInfoCreate */
+		INSERT INTO TB_STD_INFO
+		(
+			ACA_ID
+			, STD_ID
+			, STD_NM
+			, NICK_NM
+			, SEX
+			, BIRTH
+			, SCH_GRADE
+			, SCH_CD
+			, SCH_NM
+			, SCH_LVL
+			, CLS
+		   	, STUDY_LIVE_CHK
+		   	, STUDY_CARE_CHK
+		   	, EXAM_SEND_YN
+		   	, ATD_SEND_YN
+		   	, LEV_SEND_YN
+		   	, AUTO_INV_YN
+		   	, STD_STATUS
+		   	, STD_CARE_STATUS
+			, STD_URL
+			, ATD_CHK_CD
+		   	, CASH_REG_NO
+		   	<if test='std_mgt_cls != "" and std_mgt_cls != null'>
+		   		, MGT_CLS
+		   	</if>
+		   	<if test='std_mgt_num != "" and std_mgt_num != null'>
+		   		, MGT_NUM
+		   	</if>
+		    <if test='info_std_memo != "" and info_std_memo != null'>
+			   	 , MEMO
+		   	</if>
+		   	, STD_GB_TXT
+		   	, DC_YN
+		   	<if test='dc_cd != null and dc_cd != ""'>
+		   		, DC_CD
+		   	</if>
+		   	<if test='dc_tp != null and dc_tp != ""'>
+		   		, DC_TP
+		   	</if>
+		   	<if test='dc_amt != null and dc_amt != ""'>
+		   		, DC_AMT
+		   	</if>
+			, ENT_DTTM
+			, ENT_USER_ID
+		)
+		VALUES(
+			#{aca_id}
+			, TRIM(#{info_std_id})
+			, TRIM(#{std_nm})
+			, #{info_nick_nm}
+			, #{info_std_gender}
+			, #{birth}
+			, #{sch_grade}
+			, #{sch_nm}
+			, #{sch_nm}
+			, #{sch_lvl}
+			, #{std_sch_cls}
+		   	, CASE WHEN #{study_live_chk} = 'on' THEN 'Y' ELSE 'N' END
+		   	, CASE WHEN #{study_care_chk} = 'on' THEN 'Y' ELSE 'N' END
+		   	, CASE WHEN #{exam_sms_yn} = 'on' THEN 'Y' ELSE 'N' END
+		   	, CASE WHEN #{atd_sms_yn} = 'on' THEN 'Y' ELSE 'N' END
+		   	, CASE WHEN #{lev_sms_yn} = 'on' THEN 'Y' ELSE 'N' END
+		   	, CASE WHEN #{std_auto_pay} = 'on' THEN 'Y' ELSE 'N' END
+		   	<choose>
+		   		<when test='study_care_chk == "on"'>
+		   			, #{info_std_status}
+		   			, #{info_std_status}
+		   		</when>
+		   		<otherwise>
+		   			, #{info_std_status}
+		   			, '00'
+		   		</otherwise>
+		   	</choose>
+			, #{std_url}
+			, #{atd_chk_cd}
+			, #{cash_reg_no}
+			<if test='std_mgt_cls != "" and std_mgt_cls != null'>
+		   		, #{std_mgt_cls}
+		   	</if>
+			<if test='std_mgt_num != "" and std_mgt_num != null'>
+		   		, #{std_mgt_num}
+		   	</if>
+		    <if test='info_std_memo != "" and info_std_memo != null'>
+		   	 	, #{info_std_memo}
+		   	</if>
+		   	, #{std_gb_txt}
+		   	, CASE WHEN #{dc_yn} = 'Y' THEN 'Y' ELSE 'N' END
+		   	<if test='dc_cd != null and dc_cd != ""'>
+		   		, #{dc_cd}
+		   	</if>
+		   	<if test='dc_tp != null and dc_tp != ""'>
+		   		, #{dc_tp}
+		   	</if>
+		   	<if test='dc_amt != null and dc_amt !=""'>
+		   		, #{dc_amt}
+			</if>
+			, NOW()
+			, #{ent_user_id}
+		)
+	</insert>
+	
+	<insert id="stdClassInfoCreate" parameterType="com.web.kdebate.student.students.domain.CreateStudentInfoVO">
+	/* StudentInfoMngMapper.stdClassInfoCreate */
+		INSERT INTO TB_STD_CLASS
+					( STD_ID
+					, CLASS_CD
+					, USE_YN
+					, ENT_DTTM
+					, ENT_USER_ID
+					, UPT_DTTM
+					, UPT_USER_ID
+					)
+			 VALUES ( #{info_std_id}
+			 	    , #{mng_class_cd}
+			 	    , 'Y'
+			 	    , NOW()
+			 	    , #{ent_user_id}
+			 	    , NOW()
+			 	    , #{ent_user_id}
+			 	    )
+	</insert>
+
+	<insert id="stdInfoChgLogCreate" parameterType="com.web.kdebate.student.students.domain.CreateStudentInfoVO">
+	/* StudentInfoMngMapper.stdInfoChgLogCreate */
+		INSERT INTO TB_STD_INFO_CHG_LOG
+					( STD_ID
+					
+					, CHG_DT
+					, STD_STATUS
+					, CHG_REASON_CD
+					, ENT_DTTM
+					, ENT_USER_ID
+					, USE_YN
+					)
+			 VALUES ( #{info_std_id}
+			 	    , NOW()
+			 	    , #{info_std_status}
+			 	    , '01001'
+			 	    , NOW()
+			 	    , #{ent_user_id}
+			 	    , 'Y'
+			 	    )
+	</insert>
+	
+	<insert id="stdBroCreate" parameterType="com.web.kdebate.student.students.domain.CreateStudentInfoVO">
+	/* StudentInfoMngMapper.stdBroCreate */
+		INSERT INTO TB_STD_BRO
+			  ( STD_ID
+			  , BRO_STD_ID
+			  , RESP_TYPE_CD
+			  , ENT_DTTM
+			  , ENT_USER_ID
+			  )
+	     VALUES ( TRIM(#{info_std_id})
+	   		  , #{std_bro_id}
+	   		  , '01'
+	   		  , NOW()
+	   		  , #{ent_user_id}
+	          )
+	</insert>
+
+	<insert id="broStdCreate" parameterType="com.web.kdebate.student.students.domain.CreateStudentInfoVO">
+	/* StudentInfoMngMapper.broStdCreate */
+		INSERT INTO TB_STD_BRO
+			  ( STD_ID
+			  , BRO_STD_ID
+			  , RESP_TYPE_CD
+			  , ENT_DTTM
+			  , ENT_USER_ID
+			  )
+	     VALUES ( #{std_bro_id}
+	   		  , TRIM(#{info_std_id})
+	   		  , '01'
+	   		  , NOW()
+	   		  , #{ent_user_id}
+	          )
+	</insert>
+	
+	<insert id="createParentInfo" parameterType="com.web.kdebate.student.students.domain.CreateStudentInfoVO">
+	/* StudentInfoMngMapper.parentInfoCreate */
+		INSERT
+		  INTO TB_USER ( USER_ID
+				       , ACA_ID
+				       , USER_PWD
+		           	   , USER_NM
+		               , USER_GB_CD
+		               , HP_NO
+		               , ZIP_CODE
+		               , ADDR
+		               , ADDR_DTL
+		               , USE_YN
+		               , ENT_DTTM
+		               , ENT_USER_ID
+		               , UPT_DTTM
+		               , UPT_USER_ID
+			  		   )
+		  		 SELECT 
+		  		 	  REPLACE(#{parent_id}, '-', '')
+		  		      , (SELECT B.ACA_ID FROM TB_USER B WHERE B.USER_ID = #{info_std_id})
+				      , CASE WHEN #{parent_hp_no} != '' THEN PASSWORD(RIGHT(#{parent_hp_no}, 4)) ELSE PASSWORD('1234') END
+				      , #{rep_parent_nm}
+				      , '03'
+				      , #{parent_hp_no}
+				      , #{zip_code}
+					  , #{addr}
+					  , #{addr_dtl}
+				      , 'Y'
+					  , NOW()
+					  , #{ent_user_id}
+					  , NOW()
+			          , #{ent_user_id}
+			      FROM DUAL
+	</insert>
+
+	<insert id="createParent" parameterType="com.web.kdebate.student.students.domain.CreateStudentInfoVO">
+	/* StudentMapper.parentCreate */
+		INSERT
+		  INTO TB_PARENTS ( PARENT_ID
+				          , STD_ID
+				          , PARENT_GB_CD
+				          , REP_PARENT_YN
+				          , ENT_DTTM
+			              , ENT_USER_ID
+			              , UPT_DTTM
+			              , UPT_USER_ID
+			  			  )
+		  		   SELECT 
+		  		   		REPLACE(#{parent_id}, '-', '')
+		  		    	, #{info_std_id}
+				       	, #{info_rep_parent_gb}
+				       	, CASE WHEN (SELECT COUNT(*)
+									  FROM TB_PARENTS
+									 WHERE STD_ID = #{info_std_id}
+									   AND REP_PARENT_YN = 'Y') = 0 THEN 'Y'
+							   ELSE 'N'
+							   END AS REP_PARENT_YN
+					    , NOW()
+					    , #{ent_user_id}
+					    , NOW()
+			        	, #{ent_user_id}
+			        FROM DUAL
+	</insert>
+	
+	<update id="updateSaleMstInfo" parameterType="java.util.HashMap">
+	/* ReceiptMngMapper.updateSaleMstInfo */
+		UPDATE TB_SALES_MST SET
+			SALES_DT = #{payment_conf_dt}
+			, CONF_DT = #{payment_conf_dt}
+			<if test='cash_no != null and cash_no != ""'>
+				<if test='cash_no == "M"'>
+					<if test='payment_cash_reg_no != null and payment_cash_reg_no != ""'>
+					AND CASH_RECP_REG_NO = #{payment_cash_reg_no}
+					</if>
+				</if>
+			</if>
+			<if test='payment_type != null and payment_type != ""'>
+				<if test='payment_type == "MCARD"'>
+					<if test='payment_card_issue_cd != null and payment_card_issue_cd != ""'>
+					, CARD_ISSUE_CD = #{payment_card_issue_cd}
+					</if>
+					<if test='payment_card_install != null and payment_card_install != ""'>
+					, CARD_INSTALL_MONTH = #{payment_card_install}
+					</if>
+					<if test='payment_conf_no != null and payment_conf_no != ""'>
+					, CONF_NO = #{payment_conf_no}
+					</if>
+					<if test='payment_card_num1 != null and payment_card_num4 != null'>
+					, CARD_NO = CONCAT(#{payment_card_num1}, '********', #{payment_card_num4})
+					</if>
+				</if>
+			</if>
+			, UPT_DTTM = NOW()
+			, UPT_USER_ID = #{upt_user_id}	
+		WHERE
+			SALES_NO = #{payment_sales_no}			
+	</update>
+	
+	<update id="updatePaymentInfo" parameterType="java.util.HashMap">
+	/* ReceiptMngMapper.updatePaymentInfo */
+		UPDATE TB_PAYMENT SET
+			SALES_DT = #{payment_conf_dt}	
+			<if test='payment_type != null and payment_type != ""'>
+				<if test='payment_type == "MCARD"'>
+				<if test='payment_card_issue_cd != null and payment_card_issue_cd != ""'>
+				, CARD_ISSUE_CD = #{payment_card_issue_cd}
+				</if>
+				<if test='payment_conf_no != null and payment_conf_no != ""'>
+				, CONF_NO = #{payment_conf_no}
+				</if>							
+				</if>
+			</if>	
+			, UPT_DTTM = NOW()
+			, UPT_USER_ID = #{upt_user_id}				 
+		WHERE
+			INVOICE_NO = (SELECT INVOICE_NO FROM TB_SALES_MST WHERE SALES_NO = #{payment_sales_no})
+	</update>
+	
+	<update id="updateInvoiceInfo" parameterType="java.util.HashMap">
+	/* ReceiptMngMapper.updateInvoiceInfo */
+		UPDATE TB_INVOICE SET
+			PAY_DT = #{payment_conf_dt}
+			, UPT_DTTM = NOW()
+			, UPT_USER_ID = #{upt_user_id}	
+		WHERE
+			INVOICE_NO = (SELECT INVOICE_NO FROM TB_SALES_MST WHERE SALES_NO = #{payment_sales_no})
+	</update>
+
+	<!-- 학급 이동 -->
+	<select id="getStdPrevInvRetrieve" parameterType="hashMap" resultType="hashMap">
+	/* StudentInfoMngMapper.getStdPrevInvRetrieve */
+		SELECT
+			A.INVOICE_NO AS invoice_no
+			, A.INVOICE_ENC AS invoice_enc
+			, CONCAT(A.INVOICE_NM, ' (', IFNULL(DATE_FORMAT(A.LEARN_FDT, '%Y-%m-%d'), ''), ' ~ ', IFNULL(DATE_FORMAT(A.LEARN_TDT, '%Y-%m-%d'), ''), ')') AS invoice_nm
+			, CASE WHEN IFNULL(A.TOT_AMT, (A.AMT + A.VAT)) > 0 THEN IFNULL(FORMAT(A.TOT_AMT, 0), (A.AMT + A.VAT)) ELSE 0 END AS invoice_tot_amt
+			, IFNULL(DATE_FORMAT(A.LEARN_FDT, '%Y-%m-%d'), '') AS learn_fdt
+			, IFNULL(DATE_FORMAT(A.LEARN_TDT, '%Y-%m-%d'), '') AS learn_tdt
+			-- , TP.PAY_NO as pay_no
+			, A.PAY_YN AS pay_yn
+			, FORMAT(A.CLASS_AMT, 0) AS amt
+			, FORMAT(A.AMT, 0) AS tot_amt
+			, FORMAT(A.CLASS_PRICE, 0) AS class_tot_amt
+			, DATE_FORMAT(TC.CLASS_SDT,'%Y-%m-%d') as class_sdt
+			, IFNULL(TC.CLASS_EDT,'') as class_edt
+			, TC.CLASS_OPR_TP AS class_opr_tp
+			, IFNULL(A.CLASS_CNT, 0) AS class_cnt
+			, TC.CLASS_STANDING_YN as class_standing_yn
+			, TC.INVOICE_DT_GB AS class_invoice_dt_gb
+			, FN_GET_CLASS_TIME_CNT(TC.CLASS_CD, TC.CLASS_SDT, TC.CLASS_EDT) AS prtm_cnt
+			, TC.CLASS_AMT * FN_GET_CLASS_TIME_CNT(TC.CLASS_CD, TC.CLASS_SDT, TC.CLASS_EDT) AS prtm_amt
+			, CASE WHEN TC.CLASS_OPR_TP = 'TIME'
+			THEN FN_GET_REMAIN_CLASS_CNT(A.STD_ID, A.CLASS_CD)
+			ELSE ''
+			END AS inv_learn_dt
+		FROM TB_INVOICE A
+		LEFT OUTER JOIN
+			TB_CLASS TC ON TC.CLASS_CD = A.CLASS_CD
+		INNER JOIN
+			TB_ACA TA ON TA.ACA_ID = A.ACA_ID
+		WHERE 1=1
+			AND A.STD_ID = #{std_id}
+			AND A.INVOICE_TP IN ('EDU', 'REP')
+			AND A.CLASS_CD = #{prev_class_cd} 
+			AND A.USE_YN = 'Y' 
+			AND A.LEARN_TDT >= DATE(NOW())
+		GROUP BY A.INVOICE_NO
+		ORDER BY A.ENT_DTTM DESC, A.INVOICE_NM
+	</select>
+
+	<insert id="addStdClsChgLog" parameterType="hashMap">
+	/* mapper.addStdClsChgLog */
+		INSERT INTO
+			TB_STD_INFO_CHG_LOG
+			(
+			 STD_ID
+			 , STD_STATUS
+			 , CHG_DT
+			 , CHG_REASON_CD
+			 , CHG_REASON_MEMO
+			 , ACA_ID
+			 , USE_YN
+			 , CLASS_CD
+			 , ENT_DTTM
+			 , ENT_USER_ID
+			)
+			SELECT
+			   #{std_id}
+			 , #{std_status}
+			 , NOW()
+			 , #{class_reason_cd}
+			 , #{class_memo}
+			 , #{aca_id}
+			 , 'Y'
+			 , #{mg_class_cd}
+			 , NOW()
+			 , #{user_id}
+			FROM DUAL
+	</insert>
+
+
+</mapper>

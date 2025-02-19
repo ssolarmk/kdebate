@@ -1,0 +1,41 @@
+<nav class="navbar navbar-light navbar-glass navbar-top navbar-expand-lg" th:fragment="header">
+  <button class="btn navbar-toggler-humburger-icon navbar-toggler me-1 me-sm-3" type="button" data-bs-toggle="collapse" data-bs-target="#navbarStandard" aria-controls="navbarStandard" aria-expanded="false" aria-label="Toggle Navigation">
+    <span class="navbar-toggle-icon">
+      <span class="toggle-line"></span>
+    </span>
+  </button>
+  <a class="navbar-brand me-1 me-sm-3" href="#">
+    <div class="d-flex align-items-center">
+      <img class="me-2" src="/img/logos/logo.png" alt="" width="200" />
+    </div>
+  </a>
+  <div class="collapse navbar-collapse scrollbar" id="navbarStandard">
+    <ul class="navbar-nav" data-top-nav-dropdowns="data-top-nav-dropdowns">
+      <th:block th:each="menu : ${session.S_USER.topMenu}">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" id="dashboards" th:text="${menu.top_menu_name}"></a>
+          <div class="dropdown-menu dropdown-caret dropdown-menu-card border-0 mt-0" aria-labelledby="dashboards">
+            <div class="bg-white dark__bg-1000 rounded-3 py-2">
+              <th:block th:each="subMenu : ${session.S_USER.menu}">
+                <th:block th:if="${subMenu.top_menu_id == menu.top_menu_id && subMenu.left1_menu_id != null && subMenu.view_yn2 == 'Y' }">
+                  <a class="dropdown-item link-600 fw-medium" th:href="${subMenu.left1_menu_url}" th:text="${subMenu.left1_menu_name}"></a>
+                </th:block>
+              </th:block>
+            </div>
+          </div>
+        </li>
+      </th:block>
+    </ul>
+  </div>
+  <ul class="navbar-nav navbar-nav-icons ms-auto flex-row align-items-center">
+    <li class="nav-item d-none d-sm-block">
+      <span style="font-size: 16px" class="text-primary" th:text="${session.S_USER.aca_nm}"></span>
+      <span style="font-size: 16px" class="text-primary" th:text="'('+${session.S_USER.user_nm}+')'"></span>
+    </li>
+    <li class="nav-item d-none d-sm-block">
+      <a class="nav-link px-0 fa-icon-wait" href="/logout">
+        <span class="fas fa-sign-out-alt" data-fa-transform="shrink-7" style="font-size: 33px"></span>
+      </a>
+    </li>
+  </ul>
+</nav>

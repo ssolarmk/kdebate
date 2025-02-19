@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ko" data-bs-theme="light" dir="ltr" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+  <head th:replace="~{fragments/config :: config}">
+    <title layout:title-pattern="$LAYOUT_TITLE : $CONTENT_TITLE">공통 타이틀</title>
+  </head>
+  <body>
+    <main class="main" id="top">
+      <div class="container" data-layout="container">
+        <script>
+          var isFluid = JSON.parse(localStorage.getItem("isFluid"));
+          if (isFluid) {
+            var container = document.querySelector("[data-layout]");
+            container.classList.remove("container");
+            container.classList.add("container-fluid");
+          }
+        </script>
+        <!--Header 영역을 참조합니다.-->
+        <header th:replace="~{fragments/header :: header}"></header>
+
+        <!--Content 내용 영역을 참조합니다-->
+        <th:block layout:fragment="Content"></th:block>
+      </div>
+    </main>
+  </body>
+</html>

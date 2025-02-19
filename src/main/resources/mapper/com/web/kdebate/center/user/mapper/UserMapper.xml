@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.web.kdebate.center.user.mapper.UserMapper">
+
+	<select id="getUserListRetrieve" parameterType="hashMap" resultType="hashMap">
+				SELECT SQL_CALC_FOUND_ROWS
+				       TS.USER_ID AS 'user_id'
+				     , TS.USER_NM AS 'user_nm'
+				     , IFNULL(TS.ACA_ID, '') AS 'aca_id'
+				     , DATE_FORMAT(TS.ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS 'ent_dttm'
+				     , TS.USE_YN AS 'use_yn'
+				     , CASE TS.USE_YN WHEN 'Y' THEN '사용' WHEN 'N' THEN '미사용' ELSE NULL END AS 'use_yn_nm'
+				     , IFNULL(TC.ACA_NM, '') AS 'aca_name'
+				     , (
+				       SELECT GROUP_CONCAT(DISTINCT AUTH_GRP_CD ORDER BY AUTH_GRP_CD SEPARATOR ',')
+				         FROM TB_USER_TP_AUTH_GRP
+				        WHERE USER_ID=TS.USER_ID
+				        GROUP BY TS.USER_ID
+				     ) AS 'auth_grp_cd'
+				     , IFNULL((
+				      SELECT GROUP_CONCAT(DISTINCT CODE_NM ORDER BY CODE_NM SEPARATOR ',')
+				         FROM TB_CODE A
+				            , TB_USER_TP_AUTH_GRP B
+				        WHERE B.USER_ID = TS.USER_ID
+				          AND A.CODE= B.AUTH_GRP_CD
+				          AND CODE_GRP_CD='AUTH_GRP_CD'
+				          AND USE_YN='Y'
+				          AND CODE !='CODE'
+				        GROUP BY TS.USER_ID
+				     ), '') AS 'auth_grp_cd_nm'
+				     , TS.EMAIL AS 'email'
+				     , TS.TEL_NO AS 'tel_no'
+				     , TS.UPT_USER_ID AS 'upt_user_id'
+				  FROM TB_USER TS
+				  LEFT JOIN TB_USER_TP_AUTH_GRP TPA ON TPA.USER_ID=TS.USER_ID
+				  LEFT JOIN TB_ACA TC ON TC.ACA_ID=TS.ACA_ID
+				 WHERE USER_GB_CD = '01'
+				 <if test="srch_center != '' and srch_auth_gr !=null">
+		   			AND TC.ACA_ID = #{srch_center}
+		   		</if>
+		 		 <if test="srch_auth_gr !='' and srch_auth_gr !=null">
+				   AND TPA.AUTH_GRP_CD = #{srch_auth_gr}
+				 </if>
+				 <if test="srch_use_yn !='' and srch_use_yn !=null">
+				   AND TS.USE_YN = #{srch_use_yn}
+				 </if>
+				 <if test="srch_tp != ''">
+				 	<if test="srch_tp == 'name_tp'">
+				 		AND TS.USER_NM = #{srch_tp_inp}
+				 	</if>
+				 	<if test="srch_tp == 'usid_tp'">
+				 		AND TS.USER_ID = #{srch_tp_inp}
+				 	</if>
+				 </if>
+				 	GROUP BY TS.USER_ID
+				 	<choose>
+				     	<when test="sidx != '' and sidx != null">
+				     		ORDER BY ${sidx} ${sord}
+						</when>
+			  			<otherwise>
+							ORDER BY TS.ENT_DTTM DESC
+						</otherwise>
+					 </choose>
+
+
+		  	LIMIT ${start}, ${end}
+	</select>
+	<select id="getQueryTotalCnt" resultType="int">
+		SELECT FOUND_ROWS()
+	</select>
+	<select id="getAuthGrpCdRetrieve" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT DATE_FORMAT(STR_DTTM, '%Y-%m-%d %H:%i:%s') AS "str_dttm"
+			 , DATE_FORMAT(END_DTTM, '%Y-%m-%d %H:%i:%s') AS "end_dttm"
+			 , AUTH_GRP_CD AS "auth_grp_cd"
+		  FROM TB_USER_TP_AUTH_GRP
+		 WHERE USER_ID = #{user_id}
+	  ORDER BY STR_DTTM DESC
+	</select>
+	<select id="getUserCnctLogRetrieve" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT SQL_CALC_FOUND_ROWS
+		       CNCT_LOG_SQ AS "cnct_log_sq"
+			 , IFNULL(IP,'') AS "cnct_log_ip"
+			 , IFNULL(CNCT_SCS_YN,'') AS "cnct_scs_yn"
+			 , DATE_FORMAT(ENT_DTTM, '%Y-%m-%d %H:%i:%s') AS 'ent_dttm'
+			 , USER_ID AS "user_id"
+		  FROM TB_USER_CNCT_LOG
+		 WHERE 1=1
+		 <if test="usid !=''">
+		   AND USER_ID = #{user_id}
+		 </if>
+	     ORDER BY ENT_DTTM DESC
+	     LIMIT ${start}, ${end}
+	</select>
+	<select id="chkUserId" parameterType="java.util.HashMap" resultType="int">
+		SELECT COUNT(*) AS cnt
+		  FROM TB_USER
+		 WHERE USER_ID = #{user_id}
+	</select>
+	<insert id="userCreate" parameterType="com.web.kdebate.center.user.domain.UserMngVO">
+		INSERT
+		  INTO TB_USER
+  			   (  USER_ID
+	            , USER_NM
+	            , USER_PWD
+	            , ACA_ID
+	            , TEL_NO
+	            , EMAIL
+	            , USER_GB_CD
+	            , USE_YN
+	            , ENT_DTTM
+	            , ENT_USER_ID	)
+
+		VALUES (  #{user_id}
+		        , #{user_nm}
+		        , PASSWORD(#{user_pswd_new})
+		        , #{aca_id}
+		        , #{tel_no}
+		        , #{email}
+		        , '01'
+		        , #{use_yn}
+		        , NOW()
+		        , #{ent_user_id}	)
+	</insert>
+	<insert id="userAuthGrpCreate" parameterType="com.web.kdebate.center.user.domain.UserMngVO">
+		INSERT
+		  INTO TB_USER_TP_AUTH_GRP
+  			   (  USER_ID
+	            , AUTH_GRP_CD
+	            , ENT_DTTM
+	            , UPT_USER_ID	)
+
+		VALUES (  #{user_id}
+		        , #{auth_grp_cd}
+		        , NOW()
+		        , #{upt_user_id}	)
+	</insert>
+	<!-- 사용자 정보 수정 -->
+	<update id="userUpdate" parameterType="com.web.kdebate.center.user.domain.UserMngVO">
+	    UPDATE TB_USER
+	       SET USER_NM = #{user_nm}
+			<if test="user_pswd_new != '' and user_pswd_new != null">
+				, USER_PWD = PASSWORD(#{user_pswd_new})
+			</if>
+			<if test="user_ch_pswd_new != '' and user_ch_pswd_new != null">
+				, USER_PWD = PASSWORD(#{user_ch_pswd_new})
+			</if>
+	         , TEL_NO = #{tel_no}
+	         , EMAIL = #{email}
+	         , USE_YN = #{use_yn}
+	         , UPT_DTTM = NOW()
+	         , UPT_USER_ID = #{upt_user_id}
+		 WHERE USER_ID = #{user_id}
+	</update>
+
+	<!-- 권한그룹 정보 삭제 -->
+	<delete id="userAuthGrpDelete" parameterType="com.web.kdebate.center.user.domain.UserMngVO">
+	    DELETE
+	      FROM TB_USER_TP_AUTH_GRP
+		 WHERE USER_ID = #{user_id}
+	</delete>
+	<select id="getUserAllListRetrieve" resultType="hashMap">
+		SELECT * FROM TB_USER
+	</select>
+	<update id="userpwdUpdate" parameterType="hashMap">
+		UPDATE TB_USER
+		   SET HP_NO = #{HP_NO_ENC}
+		 WHERE USER_ID = #{USER_ID}
+	</update>
+
+</mapper>

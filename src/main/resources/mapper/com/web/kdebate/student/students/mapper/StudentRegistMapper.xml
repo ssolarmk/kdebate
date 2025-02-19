@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.web.kdebate.student.students.mapper.StudentRegistMapper">
+
+	<select id="getUserId" parameterType="com.web.kdebate.student.students.domain.StudentRegistVO" resultType="string">
+		SELECT T1.USER_ID AS std_parent_id
+		  FROM TB_USER T1
+		 WHERE T1.ACA_ID = #{aca_id}
+		   AND USER_GB_CD = '03'
+		   AND REPLACE(T1.HP_NO, '-', '') = REPLACE(#{parent_hp_no}, '-', '')
+	</select>
+
+	<insert id="userInfoCreate" parameterType="com.web.kdebate.student.students.domain.StudentRegistVO">
+	/* StudentRegistMapper.userInfoCreate */
+		INSERT INTO TB_USER
+		(
+			ACA_ID
+			, USER_ID
+			, USER_PWD
+			, USER_NM
+			, USER_GB_CD
+			, HP_NO
+			, EMAIL
+			, ZIP_CODE
+			, ADDR
+			, ADDR_DTL
+			, USE_YN
+			, ENT_DTTM
+			, ENT_USER_ID
+		)
+		VALUES(
+			#{aca_id}
+			, TRIM(#{std_id})
+			, PASSWORD(#{std_pw})
+			, TRIM(#{std_nm})
+			, '02'
+			, #{std_hp_no}			
+			, #{std_email}
+			, #{zip_code}
+			, #{addr}
+			, #{addr_dtl}
+			, 'Y'
+			, NOW()
+			, #{upt_user_id}
+		)
+	</insert>
+	
+	<insert id="studentInfoCreate" parameterType="com.web.kdebate.student.students.domain.StudentRegistVO">
+	/* StudentRegistMapper.studentInfoCreate */
+		INSERT INTO TB_STD_INFO
+		(
+			ACA_ID
+			, STD_ID
+			, STD_NM
+			, SEX
+			, BIRTH
+			, SCH_MAJOR			
+			, SCH_GRADE
+			, SCH_CD
+			, SCH_NM
+			, SCH_LVL
+			, CLS			
+			<if test='study_live_chk != "" and study_live_chk != null'>
+		   	 , STUDY_LIVE_CHK
+		   	</if>
+		    <if test='study_care_chk != "" and study_care_chk != null'>
+		   	 , STUDY_CARE_CHK
+		   	</if>
+		   	, STD_STATUS
+		   	, STD_CARE_STATUS
+		   	, ATD_CHK_CD
+			, STD_URL	   	
+			, ENT_DTTM
+			, ENT_USER_ID
+		)
+		VALUES(
+			#{aca_id}
+			, TRIM(#{std_id})
+			, TRIM(#{std_nm})
+			, #{std_gender}
+			, #{std_birth}
+			, #{std_sch_major}			
+			, #{sch_grade}
+			, #{sch_nm}
+			, (SELECT SCH_NM FROM TB_SCHOOL_MST WHERE SCH_CD = #{sch_nm})
+			, #{sch_lvl}
+			, #{std_sch_cls}			
+			<if test='study_live_chk != "" and study_live_chk != null'>
+		   	 , #{study_live_chk}
+		   	</if>
+		    <if test='study_care_chk != "" and study_care_chk != null'>
+		   	 , #{study_care_chk}
+		   	</if>
+		   	, '00'
+		   	, '00'
+		   	, #{atd_chk_cd}
+			, #{std_url}		
+			, NOW()
+			, #{upt_user_id}
+		)
+	</insert>
+	
+	
+	<insert id="stdInfoChgLogCreate" parameterType="com.web.kdebate.student.students.domain.StudentRegistVO">
+	/* StudentRegistMapper.stdInfoChgLogCreate */
+		INSERT INTO TB_STD_INFO_CHG_LOG
+					( STD_ID
+					, CHG_DT
+					, STD_STATUS
+					, CHG_REASON_CD
+					, ENT_DTTM
+					, ENT_USER_ID
+					, USE_YN
+					)
+			 VALUES ( #{std_id}
+			 	    , NOW()
+			 	    , '00'
+			 	    , '01001'
+			 	    , NOW()
+			 	    , #{upt_user_id}
+			 	    , 'Y'
+			 	    )
+	</insert>
+	
+	
+	<select id="stdBroList" parameterType="com.web.kdebate.student.students.domain.StudentRegistVO" resultType="hashMap">
+	/* StudentMapper.stdBroList */
+		SELECT STD_ID AS bro_std_id
+		  FROM TB_PARENTS
+		 WHERE PARENT_ID = #{std_parent_id}
+	</select>
+	
+	<insert id="stdBroCreate" parameterType="com.web.kdebate.student.students.domain.StudentRegistVO">
+	/* StudentRegistMapper.stdBroCreate */
+		INSERT INTO TB_STD_BRO
+			  ( STD_ID
+			  , BRO_STD_ID
+			  , RESP_TYPE_CD
+			  , ENT_DTTM
+			  , ENT_USER_ID
+			  )
+	     VALUES ( TRIM(#{std_id})
+	   		  , #{std_bro_id}
+	   		  , '01'
+	   		  , NOW()
+	   		  , #{upt_user_id}
+	          )
+	</insert>
+
+	<insert id="broStdCreate" parameterType="com.web.kdebate.student.students.domain.StudentRegistVO">
+	/* StudentRegistMapper.broStdCreate */
+		INSERT INTO TB_STD_BRO
+			  ( STD_ID
+			  , BRO_STD_ID
+			  , RESP_TYPE_CD
+			  , ENT_DTTM
+			  , ENT_USER_ID
+			  )
+	     VALUES ( #{std_bro_id}
+	   		  , TRIM(#{std_id})
+	   		  , '01'
+	   		  , NOW()
+	   		  , #{upt_user_id}
+	          )
+	</insert>
+	
+	<select id="getStdParentId" resultType="string">
+		SELECT FN_GET_JOB_SEQ('TB_PARENTS')
+	</select>
+	
+	<insert id="parentInfoCreate" parameterType="com.web.kdebate.student.students.domain.StudentRegistVO">
+	/* StudentRegistMapper.parentInfoCreate */
+		INSERT
+		  INTO TB_USER ( USER_ID
+				       , ACA_ID
+				       , USER_PWD
+		           	   , USER_NM
+		               , USER_GB_CD
+		               , HP_NO
+		               , ZIP_CODE
+		               , ADDR
+		               , ADDR_DTL
+		               , USE_YN
+		               , ENT_DTTM
+		               , ENT_USER_ID
+		               , UPT_DTTM
+		               , UPT_USER_ID
+			  		   )
+		  		 SELECT #{std_parent_id}
+		  		      , (SELECT B.ACA_ID FROM TB_USER B WHERE B.USER_ID = #{std_id})
+				      , PASSWORD(RIGHT(#{parent_hp_no}, 4))
+				      , #{rep_parent_nm}
+				      , '03'
+				      , #{parent_hp_no}
+				      , #{zip_code}
+					  , #{addr}
+					  , #{addr_dtl}
+				      , 'Y'
+					  , NOW()
+					  , #{upt_user_id}
+					  , NOW()
+			          , #{upt_user_id}
+			      FROM DUAL
+	</insert>
+
+	<insert id="parentCreate" parameterType="com.web.kdebate.student.students.domain.StudentRegistVO">
+	/* StudentRegistMapper.parentCreate */
+		INSERT
+		  INTO TB_PARENTS ( PARENT_ID
+				          , STD_ID
+				          , PARENT_GB_CD
+				          , REP_PARENT_YN
+				          , ENT_DTTM
+			              , ENT_USER_ID
+			              , UPT_DTTM
+			              , UPT_USER_ID
+			  			  )
+		  		   SELECT #{std_parent_id}
+		  		    	, #{std_id}
+				       	, #{parent_gb_cd}
+				       	, CASE WHEN (SELECT COUNT(*)
+									  FROM TB_PARENTS
+									 WHERE STD_ID = #{std_id}
+									   AND REP_PARENT_YN = 'Y') = 0 THEN 'Y'
+							   ELSE 'N'
+							   END AS REP_PARENT_YN
+					    , NOW()
+					    , #{upt_user_id}
+					    , NOW()
+			        	, #{upt_user_id}
+			        FROM DUAL
+	</insert>
+	
+	<select id="getStudentIdConfirm" parameterType="hashMap" resultType="int">
+	/* StudentMapper.getStudentIdConfirm */
+		SELECT COUNT(1)
+		  FROM TB_STD_INFO
+		 WHERE STD_ID = #{std_id}
+	</select>
+	
+	<select id="getParentHpNoConfirm" parameterType="hashMap" resultType="int">
+	/* StudentMapper.getParentHpNoConfirm */
+		SELECT COUNT(1)
+		  FROM TB_USER
+		 WHERE USER_GB_CD = '03'
+		   AND REPLACE(HP_NO, '-', '') = REPLACE(#{parent_hp_no}, "-", "")
+	</select>
+
+	<select id="getParentInfo" parameterType="hashMap" resultType="hashMap">
+		SELECT T1.USER_ID AS parent_id
+		     , T1.USER_NM AS parent_nm
+		  FROM TB_USER T1
+		 WHERE T1.ACA_ID = #{aca_id}
+		   AND USER_GB_CD = '03'
+		   AND REPLACE(T1.HP_NO, '-', '') = REPLACE(#{parent_hp_no}, '-', '')
+	</select>
+	
+	<select id="getStdAtdCdConfirm" parameterType="hashMap" resultType="int">
+		SELECT COUNT(1)
+		  FROM TB_STD_INFO
+		 WHERE ACA_ID = #{aca_id}
+		   AND ATD_CHK_CD = #{atd_chk_cd}
+	</select>
+
+</mapper>
