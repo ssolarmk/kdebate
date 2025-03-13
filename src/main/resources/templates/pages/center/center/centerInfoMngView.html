@@ -13,62 +13,62 @@
   </head>
   <script>
     $(function () {
-      $("#frm_aca_info").onLoadFunction();
+      $('#frm_aca_info').onLoadFunction();
       // 공통코드 조회
-      callAjax("/common/common/totalCodelist", "CODE_GRP_CD=('ACA_TP', 'VAN_CD', 'GOODS_TP', 'POS_TP', 'TAX_TP', 'SUBJECT_CD', 'GOODS_UNIT_TP', 'GOODS_PAY_CALC_TP','SCH_EDU_MGT_CD', 'ITEM_TP')", fn_code_setting);
+      callAjax('/common/common/totalCodelist', "CODE_GRP_CD=('ACA_TP', 'VAN_CD', 'GOODS_TP', 'POS_TP', 'TAX_TP', 'SUBJECT_CD', 'GOODS_UNIT_TP', 'GOODS_PAY_CALC_TP','SCH_EDU_MGT_CD', 'ITEM_TP')", fn_code_setting);
 
       function fn_code_setting(data) {
-        codeSetting("ACA_TP", data.data, "#aca_tp", "1", "", "");
-        codeSetting("VAN_CD", data.data, "#pos_van_cd", "1", "", "");
-        codeSetting("TAX_TP", data.data, "#gds_tax_tp", "1", "", "");
-        codeSetting("GOODS_TP", data.data, "#gds_goods_tp", "1", "", "");
-        codeSetting("POS_TP", data.data, "#pos_tp", "1", "", "");
-        codeSetting("SUBJECT_CD", data.data, "#mng_subject_cd", "1", "", "");
-        codeSetting("GOODS_UNIT_TP", data.data, "#gds_unit_tp", "1", "", "");
-        codeSetting("GOODS_PAY_CALC_TP", data.data, "#gds_pay_calc_tp", "1", "", "");
-        codeSetting("SCH_EDU_MGT_CD", data.data, "#office_of_education", "1", "", "");
-        codeSetting("GOODS_TP", data.data, "#srch_goods_tp", "1", "", "");
-        codeSetting("ITEM_TP", data.data, "#item_tp", "1", "", "");
+        codeSetting('ACA_TP', data.data, '#aca_tp', '1', '', '');
+        codeSetting('VAN_CD', data.data, '#pos_van_cd', '1', '', '');
+        codeSetting('TAX_TP', data.data, '#gds_tax_tp', '1', '', '');
+        codeSetting('GOODS_TP', data.data, '#gds_goods_tp', '1', '', '');
+        codeSetting('POS_TP', data.data, '#pos_tp', '1', '', '');
+        codeSetting('SUBJECT_CD', data.data, '#mng_subject_cd', '1', '', '');
+        codeSetting('GOODS_UNIT_TP', data.data, '#gds_unit_tp', '1', '', '');
+        codeSetting('GOODS_PAY_CALC_TP', data.data, '#gds_pay_calc_tp', '1', '', '');
+        codeSetting('SCH_EDU_MGT_CD', data.data, '#office_of_education', '1', '', '');
+        codeSetting('GOODS_TP', data.data, '#srch_goods_tp', '1', '', '');
+        codeSetting('ITEM_TP', data.data, '#item_tp', '1', '', '');
 
         // 캠퍼스정보 조회
-        callAjax("/center/center/centerInfoMng/getCenterInfoRetrieve", "", function (data) {
+        callAjax('/center/center/centerInfoMng/getCenterInfoRetrieve', '', function (data) {
           if (data.data != null) {
-            $("#aca_id").val(data.data.aca_id);
-            $("#aca_nm").val(data.data.aca_nm);
-            $("#aca_tp").val(data.data.aca_tp).prop("selected", true);
-            $("#aca_jisa_nm").val(data.data.jisa_nm);
-            $("#aca_open_tm").val(data.data.open_tm);
-            $("#aca_close_tm").val(data.data.close_tm);
-            $("input:radio[name=aca_use_yn][value=" + data.data.use_yn + "]").prop("checked", true);
-            $("#aca_hompage").val(data.data.hompage);
-            $("#aca_boss_id").val(data.data.boss_id);
-            $("#aca_boss_nm").val(data.data.boss_nm);
-            $("#aca_biz_no").val(data.data.biz_no);
-            $("#aca_tel_no").val(data.data.tel_no);
-            $("#aca_mobile").val(data.data.mobile);
-            $("#aca_email").val(data.data.email);
-            $("#aca_addr").val(data.data.addr);
-            $("#aca_addr_dtl").val(data.data.addr_dtl);
-            $("#aca_ent_dttm").val(data.data.ent_dttm);
-            $("#aca_upt_dttm").val(data.data.upt_dttm);
-            $("#aca_ent_user_id").val(data.data.ent_user_id);
-            $("#aca_upt_user_id").val(data.data.upt_user_id);
-            $("#aca_pcode_use_yn").val(data.data.pcode_use_yn);
+            $('#aca_id').val(data.data.aca_id);
+            $('#aca_nm').val(data.data.aca_nm);
+            $('#aca_tp').val(data.data.aca_tp).prop('selected', true);
+            $('#aca_jisa_nm').val(data.data.jisa_nm);
+            $('#aca_open_tm').val(data.data.open_tm);
+            $('#aca_close_tm').val(data.data.close_tm);
+            $('input:radio[name=aca_use_yn][value=' + data.data.use_yn + ']').prop('checked', true);
+            $('#aca_hompage').val(data.data.hompage);
+            $('#aca_boss_id').val(data.data.boss_id);
+            $('#aca_boss_nm').val(data.data.boss_nm);
+            $('#aca_biz_no').val(data.data.biz_no);
+            $('#aca_tel_no').val(data.data.tel_no);
+            $('#aca_mobile').val(data.data.mobile);
+            $('#aca_email').val(data.data.email);
+            $('#aca_addr').val(data.data.addr);
+            $('#aca_addr_dtl').val(data.data.addr_dtl);
+            $('#aca_ent_dttm').val(data.data.ent_dttm);
+            $('#aca_upt_dttm').val(data.data.upt_dttm);
+            $('#aca_ent_user_id').val(data.data.ent_user_id);
+            $('#aca_upt_user_id').val(data.data.upt_user_id);
+            $('#aca_pcode_use_yn').val(data.data.pcode_use_yn);
 
-            $("#homepage_url").val(data.data.homepage_url);
+            $('#homepage_url').val(data.data.homepage_url);
 
             /* 코드관리 신규 저장버튼 */
-            if (data.data.pcode_use_yn == "Y") {
-              $("#btn_code_update").show();
-              $("#btn_code_clear").show();
+            if (data.data.pcode_use_yn == 'Y') {
+              $('#btn_code_update').show();
+              $('#btn_code_clear').show();
             } else {
-              $("#btn_code_update").hide();
-              $("#btn_code_clear").hide();
+              $('#btn_code_update').hide();
+              $('#btn_code_clear').hide();
             }
           }
         });
       }
-      var tbl_cls_room_list = $("#tbl_cls_room_list").DataTable({
+      var tbl_cls_room_list = $('#tbl_cls_room_list').DataTable({
         processing: true,
         serverSide: true,
         select: true,
@@ -83,28 +83,28 @@
         pageLength: 10,
         info: false,
         language: {
-          emptyTable: "데이터가 없습니다.",
-          search: "검색:",
-          zeroRecords: "일치하는 데이터가 없습니다.",
-          loadingRecords: "로딩중...",
-          processing: "처리중...",
+          emptyTable: '데이터가 없습니다.',
+          search: '검색:',
+          zeroRecords: '일치하는 데이터가 없습니다.',
+          loadingRecords: '로딩중...',
+          processing: '처리중...',
         },
         ajax: {
-          url: "/center/center/centerInfoMng/getClsRoomListRetrieve",
-          contentType: "application/json",
-          type: "POST",
+          url: '/center/center/centerInfoMng/getClsRoomListRetrieve',
+          contentType: 'application/json',
+          type: 'POST',
           data: function (postData) {
-            formData = $("#aca_id").serializeObject();
+            formData = $('#aca_id').serializeObject();
             Object.assign(postData, formData);
             return JSON.stringify(postData);
           },
         },
-        columns: [{ data: "cls_room_nm" }, { data: "cls_seat_cnt" }, { data: "cls_use_yn_nm" }],
+        columns: [{ data: 'cls_room_nm' }, { data: 'cls_seat_cnt' }, { data: 'cls_use_yn_nm' }],
       });
 
-      $("#btn_aca_update").click(function () {
-        $("input:radio[name=pcode_use_yn]").removeAttr("disabled");
-        var form = $("#frm_aca_info");
+      $('#btn_aca_update').click(function () {
+        $('input:radio[name=pcode_use_yn]').removeAttr('disabled');
+        var form = $('#frm_aca_info');
         var formData = form.serializeObject();
         var checked = true;
         $.each(form, function (i, val) {
@@ -113,47 +113,70 @@
           }
         });
         if (checked) {
-          ConfirmdialogToAjax("update", "/center/center/centerInfoMng/centerUpdate", formData, fn_return_acaUpdate);
+          ConfirmdialogToAjax('update', '/center/center/centerInfoMng/centerUpdate', formData, fn_return_acaUpdate);
         }
       });
       function fn_return_acaUpdate(data) {
         var resultCode = data.resultCode;
         var resultMsg = data.resultMsg;
-        $("#frm_aca_info")[0].reset();
+        $('#frm_aca_info')[0].reset();
 
-        if (resultCode == "S000") {
-          swal("성공", "작업을 정상적으로 완료하였습니다.", "success");
+        if (resultCode == 'S000') {
+          swal('성공', '작업을 정상적으로 완료하였습니다.', 'success');
 
-          $("#aca_boss_hp_chg").val("N");
+          $('#aca_boss_hp_chg').val('N');
 
           // 캠퍼스정보 조회
-          callAjax("/center/center/centerInfoMng/getCenterInfoRetrieve", "", function (data) {
+          callAjax('/center/center/centerInfoMng/getCenterInfoRetrieve', '', function (data) {
             if (data.data != null) {
-              $("#aca_id").val(data.data.aca_id);
-              $("#aca_nm").val(data.data.aca_nm);
-              $("#aca_tp").val(data.data.aca_tp).prop("selected", true);
-              $("#aca_jisa_nm").val(data.data.jisa_nm);
-              $("#aca_open_tm").val(data.data.open_tm);
-              $("#aca_close_tm").val(data.data.close_tm);
-              $("input:radio[name=aca_use_yn][value=" + data.data.use_yn + "]").prop("checked", true);
-              $("#aca_hompage").val(data.data.hompage);
-              $("#aca_boss_id").val(data.data.boss_id);
-              $("#aca_boss_nm").val(data.data.boss_nm);
-              $("#aca_biz_no").val(data.data.biz_no);
-              $("#aca_tel_no").val(data.data.tel_no);
-              $("#aca_mobile").val(data.data.mobile);
-              $("#aca_email").val(data.data.email);
-              $("#aca_addr").val(data.data.addr);
-              $("#aca_addr_dtl").val(data.data.addr_dtl);
-              $("#aca_ent_dttm").val(data.data.ent_dttm);
-              $("#aca_upt_dttm").val(data.data.upt_dttm);
-              $("#aca_ent_user_id").val(data.data.ent_user_id);
-              $("#aca_upt_user_id").val(data.data.upt_user_id);
-              $("input:radio[name=pcode_use_yn]").attr("disabled", "disabled");
+              $('#aca_id').val(data.data.aca_id);
+              $('#aca_nm').val(data.data.aca_nm);
+              $('#aca_tp').val(data.data.aca_tp).prop('selected', true);
+              $('#aca_jisa_nm').val(data.data.jisa_nm);
+              $('#aca_open_tm').val(data.data.open_tm);
+              $('#aca_close_tm').val(data.data.close_tm);
+              $('input:radio[name=aca_use_yn][value=' + data.data.use_yn + ']').prop('checked', true);
+              $('#aca_hompage').val(data.data.hompage);
+              $('#aca_boss_id').val(data.data.boss_id);
+              $('#aca_boss_nm').val(data.data.boss_nm);
+              $('#aca_biz_no').val(data.data.biz_no);
+              $('#aca_tel_no').val(data.data.tel_no);
+              $('#aca_mobile').val(data.data.mobile);
+              $('#aca_email').val(data.data.email);
+              $('#aca_addr').val(data.data.addr);
+              $('#aca_addr_dtl').val(data.data.addr_dtl);
+              $('#aca_ent_dttm').val(data.data.ent_dttm);
+              $('#aca_upt_dttm').val(data.data.upt_dttm);
+              $('#aca_ent_user_id').val(data.data.ent_user_id);
+              $('#aca_upt_user_id').val(data.data.upt_user_id);
+              $('input:radio[name=pcode_use_yn]').attr('disabled', 'disabled');
+              if (data.data.sms_uid == null) {
+                $('#btn_tel_no_update').attr('disabled', 'disabled');
+                $('#sms_uid').val('');
+              } else {
+                $('#btn_tel_no_update').removeAttr('disabled');
+                $('#sms_uid').val(data.data.sms_uid);
+              }
             }
           });
         }
       }
+      /* sms 전화번호 등록 이벤트 */
+      $('#btn_tel_no_update').click(function () {
+        if ($('#sms_uid').val() != '') {
+          var url = 'http://smsmsgr.ione24.com/_outside_support/hp_auth.aspx?pid=' + $('#sms_uid').val() + '&ppwd=' + $('#sms_uid').val();
+          window.open('', 'SMS 등록', 'height=' + screen.height + ',width=' + screen.width + ', scrollbars=yes, location=yes, menubar=yes, toolbar=yes, status=yes');
+
+          var frmData = document.sms_form;
+          frmData.target = 'SMS 등록';
+          frmData.action = url;
+
+          frmData.submit();
+        } else {
+          swal('경고', 'SMS 인증등록을 해주세요.', 'error');
+          return;
+        }
+      });
     });
   </script>
   <div class="content">
@@ -198,7 +221,12 @@
             <div class="row py-1">
               <label class="col-md-1 col-form-label col-form-label-sm text-end">전화번호</label>
               <div class="col-md-3">
-                <input type="text" class="form-control form-control-sm" id="aca_tel_no" name="aca_tel_no" istyle="phone" maxlength="13" required />
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control form-control-sm" id="aca_tel_no" name="aca_tel_no" maxlength="13" required />
+                  <div class="input-group-btn">
+                    <button type="button" class="btn btn-primary btn-sm" id="btn_tel_no_update" name="btn_tel_no_update" disabled>등록/확인</button>
+                  </div>
+                </div>
               </div>
               <label class="col-md-1 col-form-label col-form-label-sm text-end">Mobile</label>
               <div class="col-md-3">

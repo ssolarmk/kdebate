@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.web.kdebate.common.common.mapper.SmsMapper">
+	<select id="getMsgSendRetrieve" resultType="com.web.kdebate.common.common.domain.SmsInfoVO">
+		SELECT SEQ as seq
+	      	 , DATE_FORMAT(TS.RESERVED_DATE, '%Y%m%d%H%i%s') AS reservedDate
+		     , TS.MT_TYPE as mtType
+		     , TS.PHONE_NUMBER as phoneNumber
+		     , TS.CALLBACK as callback
+		     , TS.TITLE as title
+		     , TS.MESSAGE as message
+		     , TS.RETUNR_SEQ as retunr_seq
+		     , TS.REQUEST_DATE as request_date
+		     , TS.RESPONSE_DATE as response_date
+		     , TS.RESPONSE_CODE as response_code
+		     , TS.REPORT_TYPE as report_type
+		     , TS.REPORT_DATE as report_date
+		     , TS.REPORT_CODE as report_code
+		     , TS.ARRIVAL_DATE as arrival_date
+		     , TS.ACA_ID as aca_id
+		     , TS.STD_ID as std_id
+		     , TS.ENT_USER_ID as ent_user_id
+		     , TS.STATUS as status
+		     , (SELECT SMS_AUTH_CODE FROM TB_ACA WHERE ACA_ID = TS.ACA_ID) AS 'key'
+		     , TA.SMS_UID AS sms_uid
+	      FROM TB_SMS TS
+	      LEFT OUTER JOIN TB_ACA TA
+	        ON TS.ACA_ID = TA.ACA_ID
+	     WHERE STATUS = 0
+	     LIMIT 0, 100
+	</select>
+
+	<update id="setSetMsgStatus" parameterType="com.web.kdebate.common.common.domain.SmsInfoVO">
+		UPDATE TB_SMS
+		   SET STATUS = #{status}
+		   	 , STATUS_MSG = #{status_msg}
+		 WHERE SEQ = #{seq}
+	</update>
+	<update id="setMsgFinalStatus" parameterType="com.web.kdebate.common.common.domain.SmsStatusVO">
+		UPDATE TB_SMS
+		   SET STATUS = CASE WHEN #{status} = "성공" THEN "3"
+		   					 WHEN #{status} = "발송중" THEN "31"
+		   					 ELSE "39"
+		   					 END
+		     , STATUS_MSG = #{body}
+		 WHERE SEQ = #{seq}
+	</update>
+
+	<select id="getAcaSmsUidList" resultType="hashMap">
+		SELECT SMS_UID AS sms_uid
+		  FROM TB_ACA
+		 WHERE USE_YN = 'Y'
+		   AND SMS_UID IS NOT NULL
+		   AND SMS_UID != ''
+	</select>
+</mapper>

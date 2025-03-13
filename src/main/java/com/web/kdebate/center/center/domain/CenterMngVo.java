@@ -35,6 +35,8 @@ public class CenterMngVo {
     private String upt_dttm = null;
     private String upt_user_id = null;
     private String biz_nm = null;
+    private String mig_a_code = null;
+    private String mig_home_code = null;
 
     /* 계약정보 */
     private String cont_aca_id = null;

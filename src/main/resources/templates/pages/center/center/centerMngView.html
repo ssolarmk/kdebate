@@ -56,6 +56,7 @@
         columns: [{ data: 'aca_nm' }, { data: 'aca_id' }, { data: 'hp_no' }, { data: 'cont_stat_nm' }, { data: 'ent_user_id' }, { data: 'ent_dttm' }],
       });
       $('#tbl_center_list tbody').on('click', 'tr', function () {
+        $('input:radio[name=use_yn]').prop('checked', false);
         $('#frm_center_info').clearForm();
         var data = tbl_center_list.row(this).data();
         $('#aca_id').val(data.aca_id);
@@ -78,6 +79,19 @@
         $('#mig_a_code').val(data.mig_a_code);
         $('#mig_home_code').val(data.mig_home_code);
         $('input:radio[name=use_yn]:input[value=' + data.use_yn + ']').attr('checked', true);
+
+        if (data.sms_uid == '') {
+          $('#btn_sms_uid_update').removeAttr('disabled');
+          $('#sms_uid').val(data.sms_sid + '_' + data.aca_id);
+
+          $('#btn_tel_no_update').attr('disabled', 'disabled');
+        } else {
+          $('#btn_sms_uid_update').attr('disabled', 'disabled');
+          $('#sms_uid').val(data.sms_uid);
+
+          $('#btn_tel_no_update').removeAttr('disabled');
+        }
+
         $('#center_updt_gb').val('update');
       });
       /* 주소 검색 */
@@ -137,9 +151,7 @@
 
           $('#boss_id').attr('readonly', false);
           $('#user_pwd').removeAttr('disabled');
-          $('input:radio[name=cont_stat]').prop('checked', false);
           $('input:radio[name=use_yn]').prop('checked', false);
-          $('input:radio[name=auth_yn]').prop('checked', false);
         }
       }
       $('#btn_center_clear').click(function () {
@@ -148,9 +160,7 @@
         $('#frm_center_info').clearForm();
         $('#boss_id').attr('readonly', false);
         $('#user_pwd').removeAttr('disabled');
-        $('input:radio[name=cont_stat]').prop('checked', false);
         $('input:radio[name=use_yn]').prop('checked', false);
-        $('input:radio[name=auth_yn]').prop('checked', false);
         $('#btn_boss_id_login').hide();
         $('#btn_dup_cnfm').show();
         $('#center_updt_gb').val('create');
@@ -183,8 +193,38 @@
           }
         }
       }
+      /* sms 인증 등록 이벤트 */
+      $('#btn_sms_uid_update').click(function () {
+        callAjax('/center/center/centerMng/smsUidInfoUpdate', 'sms_uid=' + $('#sms_uid').val() + '&aca_id=' + $('#aca_id').val(), function (data) {
+          if (data.resultCode == 'S000') {
+            swal('성공', '작업을 정상적으로 완료하였습니다.', 'success');
+            $('#btn_sms_uid_update').attr('disabled', 'disabled');
+            $('#btn_tel_no_update').removeAttr('disabled');
+            tbl_center_list.ajax.reload();
+          } else if (data.resultCode == 'S111') {
+            swal('경고', '아이디가 이미 존재합니다.', 'error');
+          }
+        });
+      });
+      /* sms 전화번호 등록 이벤트 */
+      $('#btn_tel_no_update').click(function () {
+        if ($('#sms_uid').val() != '') {
+          var url = 'http://smsmsgr.ione24.com/_outside_support/hp_auth.aspx?pid=' + $('#sms_uid').val() + '&ppwd=' + $('#sms_uid').val();
+          window.open('', 'SMS 등록', 'height=' + screen.height + ',width=' + screen.width + ', scrollbars=yes, location=yes, menubar=yes, toolbar=yes, status=yes');
+
+          var frmData = document.sms_form;
+          frmData.target = 'SMS 등록';
+          frmData.action = url;
+
+          frmData.submit();
+        } else {
+          swal('경고', 'SMS 인증등록을 해주세요.', 'error');
+          return;
+        }
+      });
     });
   </script>
+  <form name="sms_form" id="sms_form" method="post"></form>
   <div class="content">
     <div class="row g-0">
       <div class="col-lg-6 pe-lg-2 mb-3">
@@ -289,8 +329,14 @@
               </div>
               <div class="row py-2">
                 <label class="col-md-2 col-form-label col-form-label-sm text-end">전화번호</label>
+
                 <div class="col-md-4">
-                  <input type="text" class="form-control form-control-sm" name="tel_no" id="tel_no" istyle="phone" maxlength="13" required />
+                  <div class="input-group input-group-sm">
+                    <input type="text" class="form-control form-control-sm" name="tel_no" id="tel_no" istyle="phone" maxlength="13" required />
+                    <div class="input-group-btn">
+                      <button type="button" class="btn btn-primary btn-sm" id="btn_tel_no_update" name="btn_tel_no_update">등록/확인</button>
+                    </div>
+                  </div>
                 </div>
                 <label class="col-md-2 col-form-label col-form-label-sm text-end">핸드폰</label>
                 <div class="col-md-4">
@@ -351,6 +397,15 @@
                   <div class="form-check form-check-inline">
                     <input type="radio" class="form-check-input" id="use_yn_n" name="use_yn" value="N" />
                     <label class="form-check-label" for="use_yn_n">미사용</label>
+                  </div>
+                </div>
+                <label class="col-md-2 col-form-label col-form-label-sm text-end">SMS 인증</label>
+                <div class="col-md-4">
+                  <div class="input-group input-group-sm">
+                    <input type="text" class="form-control form-control-sm" name="sms_uid" id="sms_uid" disabled />
+                    <div class="input-group-btn">
+                      <button type="button" class="btn btn-primary btn-sm" id="btn_sms_uid_update"><i class="fa fa-check"></i> <strong>인증등록</strong></button>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -832,7 +832,7 @@ public class CenterMngController {
 		SessionVO member = (SessionVO) session.getAttribute("S_USER");
 		hashmapParam.put("upt_user_id", member.getUser_id());
 
-		String url = "http://smsmsgr.ione24.com/_support/mem_check_owra.ashx?pkind=1&pid="+ hashmapParam.get("sms_uid") + "&ppwd=" + hashmapParam.get("sms_uid");
+		String url = "http://smsmsgr.ione24.com/_support/mem_check_kdebate.ashx?pkind=1&pid="+ hashmapParam.get("sms_uid") + "&ppwd=" + hashmapParam.get("sms_uid");
 
 		try {
 			HashMap<String, String> hashmapResponse = (HashMap<String, String>) HttpUtil.callURL(url, null, null, "EUC_KR");

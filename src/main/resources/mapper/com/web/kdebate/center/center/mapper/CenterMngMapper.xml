@@ -70,6 +70,7 @@
 		     , A.BIZ_NM AS biz_nm
 			 , A.MIG_A_CODE AS mig_a_code
 			 , A.MIG_HOME_CODE AS mig_home_code
+			 , (SELECT CHK_CD1 FROM TB_CODE WHERE CODE_GRP_CD = 'SYSTEM_CODE' AND CODE = 'SMS_SID' AND USE_YN = 'Y' LIMIT 1) AS sms_sid
 		  FROM TB_ACA A
 		  LEFT OUTER JOIN TB_USER B
 		    ON A.BOSS_ID = B.USER_ID

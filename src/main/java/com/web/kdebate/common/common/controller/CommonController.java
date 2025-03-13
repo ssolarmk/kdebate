@@ -1642,7 +1642,7 @@ public class CommonController implements Serializable{
 			e.printStackTrace();
 		}
 
-		mv.setViewName("/common/common/testBookRsltReportView");
+		mv.setViewName("pages/learning/learn/testBookRsltReportView");
 		
 		return mv;
 	  }

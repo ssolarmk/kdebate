@@ -54,7 +54,7 @@
           return;
         }
 
-        $('#live_chk').trigger('change');
+        table_exam_std_list.ajax.reload();
       });
       /* 독서레벨 조회 */
       fn_get_reading_lvl();
@@ -413,7 +413,7 @@
         <div class="card-header py-2"><h5>독서레벨평가 관리</h5></div>
         <div class="card-body bg-body-tertiary">
           <div class="px-3 py-0">
-            <form class="form-horizontal" id="frm_std_srch" name="frm_std_srch">
+            <form class="form-horizontal" id="frm_std_srch" name="frm_std_srch" onsubmit="return false;">
               <input type="hidden" name="subject_cd" id="srch_subject_cd" />
               <input type="hidden" name="live_chk" id="hid_live_chk" />
               <div class="row py-1">
